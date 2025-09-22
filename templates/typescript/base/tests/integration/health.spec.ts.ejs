@@ -1,0 +1,13 @@
+import request from 'supertest';
+import { buildTestApp } from '../utils/test-app';
+
+describe('Health check', () => {
+  it('returns application status', async () => {
+    const app = buildTestApp();
+
+    const response = await request(app).get('/health');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ status: 'ok' });
+  });
+});

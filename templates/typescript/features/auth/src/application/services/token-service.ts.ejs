@@ -1,0 +1,18 @@
+import { User, UserRole } from '../../domain/entities/user';
+
+export interface AccessPayload {
+  sub: string;
+  role: UserRole;
+}
+
+export interface TokenPair {
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface TokenService {
+  issueTokens(user: User): Promise<TokenPair>;
+  refreshTokens(refreshToken: string): Promise<TokenPair>;
+  revokeToken(refreshToken: string): Promise<void>;
+  verifyAccessToken(token: string): AccessPayload;
+}

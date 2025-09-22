@@ -1,0 +1,8 @@
+import { ApplicationError } from './application-error';
+
+export class AuthenticationError extends ApplicationError {
+  constructor(message = 'Invalid credentials') {
+    super(message, 401);
+    this.name = 'AuthenticationError';
+  }
+}

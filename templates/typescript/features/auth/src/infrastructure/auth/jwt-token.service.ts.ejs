@@ -1,0 +1,105 @@
+import crypto from 'node:crypto';
+import jwt from 'jsonwebtoken';
+import { env } from '../../../infrastructure/config/env';
+import { AuthenticationError } from '../../application/errors/authentication-error';
+import { RefreshTokenRepository } from '../../domain/repositories/refresh-token-repository';
+import { createRefreshToken } from '../../domain/entities/refresh-token';
+import { User, UserRole } from '../../domain/entities/user';
+import { AccessPayload, TokenPair, TokenService } from '../../application/services/token-service';
+import { UserRepository } from '../../domain/repositories/user-repository';
+
+function parseDuration(duration: string): number {
+  const match = duration.match(/^(\d+)([smhd])$/i);
+
+  if (!match) {
+    throw new Error(`Invalid duration format: ${duration}`);
+  }
+
+  const value = Number(match[1]);
+  const unit = match[2].toLowerCase();
+  const unitMultipliers: Record<string, number> = {
+    s: 1000,
+    m: 60 * 1000,
+    h: 60 * 60 * 1000,
+    d: 24 * 60 * 60 * 1000,
+  };
+
+  return value * unitMultipliers[unit];
+}
+
+function hashRefreshToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+export class JwtTokenService implements TokenService {
+  private readonly accessTokenTtlMs = parseDuration(env.ACCESS_TOKEN_TTL);
+  private readonly refreshTokenTtlMs = parseDuration(env.REFRESH_TOKEN_TTL);
+
+  constructor(
+    private readonly refreshTokenRepository: RefreshTokenRepository,
+    private readonly userRepository: UserRepository
+  ) {}
+
+  async issueTokens(user: User): Promise<TokenPair> {
+    const accessToken = this.generateAccessToken(user.id, user.role);
+    const refreshTokenValue = crypto.randomUUID();
+
+    const refreshToken = createRefreshToken({
+      userId: user.id,
+      token: hashRefreshToken(refreshTokenValue),
+      expiresAt: new Date(Date.now() + this.refreshTokenTtlMs),
+    });
+
+    await this.refreshTokenRepository.create(refreshToken);
+
+    return { accessToken, refreshToken: refreshTokenValue };
+  }
+
+  async refreshTokens(refreshToken: string): Promise<TokenPair> {
+    const hashedToken = hashRefreshToken(refreshToken);
+    const storedToken = await this.refreshTokenRepository.findByToken(hashedToken);
+
+    if (!storedToken) {
+      throw new AuthenticationError('Refresh token invalid');
+    }
+
+    if (storedToken.expiresAt.getTime() < Date.now()) {
+      await this.refreshTokenRepository.delete(hashedToken);
+      throw new AuthenticationError('Refresh token expired');
+    }
+
+    const user = await this.userRepository.findById(storedToken.userId);
+
+    if (!user) {
+      await this.refreshTokenRepository.delete(hashedToken);
+      throw new AuthenticationError('User not found');
+    }
+
+    await this.refreshTokenRepository.delete(hashedToken);
+
+    return this.issueTokens(user);
+  }
+
+  async revokeToken(refreshToken: string): Promise<void> {
+    await this.refreshTokenRepository.delete(hashRefreshToken(refreshToken));
+  }
+
+  verifyAccessToken(token: string): AccessPayload {
+    const payload = jwt.verify(token, env.JWT_SECRET) as jwt.JwtPayload;
+
+    if (!payload.sub || !payload.role) {
+      throw new AuthenticationError('Invalid access token');
+    }
+
+    return {
+      sub: String(payload.sub),
+      role: payload.role as UserRole,
+    };
+  }
+
+  private generateAccessToken(userId: string, role: UserRole): string {
+    return jwt.sign({ sub: userId, role }, env.JWT_SECRET, {
+      expiresIn: Math.floor(this.accessTokenTtlMs / 1000),
+    });
+  }
+}

@@ -1,0 +1,40 @@
+import cors from 'cors';
+import express from 'express';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import { env } from '../../infrastructure/config/env';
+import { httpLogger } from '../../infrastructure/logging/logger';
+import { routes } from './routes';
+import { errorHandler } from './middlewares/error-handler';
+import { notFoundHandler } from './middlewares/not-found-handler';
+import { registerDocs } from './docs/swagger';
+
+export function createApp() {
+  const app = express();
+
+<% if (features.includes('auth')) { %>
+  app.set('trust proxy', 1);
+<% } %>
+  app.use(helmet());
+  app.use(cors({
+    origin: env.CORS_ORIGIN === '*' ? true : env.CORS_ORIGIN.split(',').map((origin) => origin.trim()),
+  }));
+  app.use(express.json());
+  app.use(httpLogger);
+
+  app.use(
+    rateLimit({
+      windowMs: env.RATE_LIMIT_WINDOW_MINUTES * 60 * 1000,
+      max: env.RATE_LIMIT_MAX_REQUESTS,
+      standardHeaders: true,
+      legacyHeaders: false,
+    })
+  );
+
+  registerDocs(app);
+  app.use(routes);
+  app.use(notFoundHandler);
+  app.use(errorHandler);
+
+  return app;
+}

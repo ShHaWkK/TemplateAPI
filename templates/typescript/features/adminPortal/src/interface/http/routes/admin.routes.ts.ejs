@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { adminPortalController } from '../controllers/admin-portal.controller';
+import { asyncHandler } from '../../utils/async-handler';
+
+export const adminPortalRoutes = Router();
+
+adminPortalRoutes.get(
+  '/dashboard',
+  asyncHandler((request, response) => adminPortalController.dashboard(request, response))
+);

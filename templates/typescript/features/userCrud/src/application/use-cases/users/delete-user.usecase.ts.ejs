@@ -1,0 +1,25 @@
+import { NotFoundError } from '../../errors/not-found-error';
+import { UserRepository } from '../../../domain/repositories/user-repository';
+import { RefreshTokenRepository } from '../../../domain/repositories/refresh-token-repository';
+
+interface DeleteUserRequest {
+  userId: string;
+}
+
+export class DeleteUserUseCase {
+  constructor(
+    private readonly userRepository: UserRepository,
+    private readonly refreshTokenRepository: RefreshTokenRepository
+  ) {}
+
+  async execute({ userId }: DeleteUserRequest): Promise<void> {
+    const user = await this.userRepository.findById(userId);
+
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    await this.refreshTokenRepository.deleteByUser(userId);
+    await this.userRepository.delete(userId);
+  }
+}

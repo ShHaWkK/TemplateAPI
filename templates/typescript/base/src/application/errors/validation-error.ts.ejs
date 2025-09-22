@@ -1,0 +1,9 @@
+import { ZodError } from 'zod';
+import { ApplicationError } from './application-error';
+
+export class ValidationError extends ApplicationError {
+  constructor(public readonly error: ZodError) {
+    super('Validation error', 422, error.flatten());
+    this.name = 'ValidationError';
+  }
+}

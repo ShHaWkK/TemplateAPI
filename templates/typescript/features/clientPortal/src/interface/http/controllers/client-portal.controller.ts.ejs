@@ -1,0 +1,16 @@
+import { Request, Response } from 'express';
+
+class ClientPortalController {
+  async dashboard(request: Request, response: Response) {
+    return response.status(200).json({
+      message: `Bienvenue dans votre espace client, ${request.user.id}!`,
+      stats: {
+        activeSubscriptions: 2,
+        pendingInvoices: 1,
+        lastLoginAt: new Date().toISOString(),
+      },
+    });
+  }
+}
+
+export const clientPortalController = new ClientPortalController();

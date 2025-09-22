@@ -1,0 +1,27 @@
+{
+  "name": "<%- packageName %>",
+  "version": "0.1.0",
+  "private": true,
+  "description": "API Node.js générée avec create-template-api.",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "scripts": {
+<% Object.entries(scripts).forEach(([name, command], index, array) => { %>
+    "<%- name %>": "<%- command %>"<%= index < array.length - 1 ? ',' : '' %>
+<% }); %>
+  },
+  "dependencies": {
+<% dependencies.forEach((dependency, index) => { %>
+    "<%- dependency.name %>": "<%- dependency.version %>"<%= index < dependencies.length - 1 ? ',' : '' %>
+<% }); %>
+  },
+  "devDependencies": {
+<% devDependencies.forEach((dependency, index) => { %>
+    "<%- dependency.name %>": "<%- dependency.version %>"<%= index < devDependencies.length - 1 ? ',' : '' %>
+<% }); %>
+  }
+}

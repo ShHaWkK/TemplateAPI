@@ -1,0 +1,422 @@
+import type { OpenAPIV3 } from 'openapi-types';
+
+export const openApiDocument: OpenAPIV3.Document = {
+  openapi: '3.0.3',
+  info: {
+    title: '<%- projectName %>',
+    version: '1.0.0',
+    description: 'API générée avec create-template-api.',
+  },
+  servers: [{ url: 'http://localhost:3333', description: 'Local' }],
+  tags: [
+    { name: 'Health', description: 'Monitoring et disponibilité de l\'API.' },
+<% if (features.includes('auth')) { %>
+    { name: 'Auth', description: 'Inscription, connexion et gestion des tokens.' },
+    { name: 'Profile', description: 'Profil de l\'utilisateur courant.' },
+<% } %>
+<% if (features.includes('userCrud')) { %>
+    { name: 'Users', description: 'Administration des utilisateurs.' },
+<% } %>
+<% if (features.includes('clientPortal')) { %>
+    { name: 'Client', description: 'Espace réservé aux clients.' },
+<% } %>
+<% if (features.includes('adminPortal')) { %>
+    { name: 'Admin', description: 'Espace réservé aux administrateurs.' },
+<% } %>
+  ],
+  paths: {
+    '/health': {
+      get: {
+        tags: ['Health'],
+        summary: 'Vérifie la disponibilité du service',
+        responses: {
+          '200': {
+            description: 'Santé du service',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    status: { type: 'string' },
+                    uptime: { type: 'number' },
+                    timestamp: { type: 'string', format: 'date-time' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+<% if (features.includes('auth')) { %>
+    '/auth/register': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Inscription d\'un nouvel utilisateur',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['name', 'email', 'password'],
+                properties: {
+                  name: { type: 'string' },
+                  email: { type: 'string', format: 'email' },
+                  password: { type: 'string', format: 'password' },
+                  role: { $ref: '#/components/schemas/UserRole' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': {
+            description: 'Utilisateur créé et connecté',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AuthTokens' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/auth/login': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Connexion utilisateur',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['email', 'password'],
+                properties: {
+                  email: { type: 'string', format: 'email' },
+                  password: { type: 'string', format: 'password' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Tokens générés',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AuthTokens' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/auth/refresh': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Renouvelle un access token via refresh token',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['refreshToken'],
+                properties: {
+                  refreshToken: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Nouveaux tokens',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AuthTokens' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/auth/logout': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Révoque un refresh token actif',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['refreshToken'],
+                properties: {
+                  refreshToken: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '204': { description: 'Refresh token révoqué' }
+        },
+      },
+    },
+    '/me': {
+      get: {
+        tags: ['Profile'],
+        summary: 'Retourne le profil courant',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Profil courant',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/User' },
+              },
+            },
+          },
+        },
+      },
+    },
+<% } %>
+<% if (features.includes('userCrud')) { %>
+    '/users': {
+      get: {
+        tags: ['Users'],
+        summary: 'Liste paginée des utilisateurs',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Liste des utilisateurs',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    users: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/User' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ['Users'],
+        summary: 'Crée un utilisateur',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['name', 'email', 'password', 'role'],
+                properties: {
+                  name: { type: 'string' },
+                  email: { type: 'string', format: 'email' },
+                  password: { type: 'string', format: 'password' },
+                  role: { $ref: '#/components/schemas/UserRole' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': {
+            description: 'Utilisateur créé',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/User' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/users/{userId}': {
+      parameters: [
+        {
+          name: 'userId',
+          in: 'path',
+          required: true,
+          schema: { type: 'string' },
+        },
+      ],
+      get: {
+        tags: ['Users'],
+        summary: 'Consulte un utilisateur',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Utilisateur',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/User' },
+              },
+            },
+          },
+        },
+      },
+      patch: {
+        tags: ['Users'],
+        summary: 'Met à jour un utilisateur',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  email: { type: 'string', format: 'email' },
+                  password: { type: 'string', format: 'password' },
+                  role: { $ref: '#/components/schemas/UserRole' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Utilisateur mis à jour',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/User' },
+              },
+            },
+          },
+        },
+      },
+      delete: {
+        tags: ['Users'],
+        summary: 'Supprime un utilisateur',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          '204': { description: 'Utilisateur supprimé' },
+        },
+      },
+    },
+<% } %>
+<% if (features.includes('clientPortal')) { %>
+    '/client/dashboard': {
+      get: {
+        tags: ['Client'],
+        summary: 'Tableau de bord client',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Données du tableau de bord client',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    message: { type: 'string' },
+                    stats: {
+                      type: 'object',
+                      additionalProperties: { type: 'number' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+<% } %>
+<% if (features.includes('adminPortal')) { %>
+    '/admin/dashboard': {
+      get: {
+        tags: ['Admin'],
+        summary: 'Tableau de bord administrateur',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Indicateurs clés administrateur',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    message: { type: 'string' },
+                    metrics: {
+                      type: 'object',
+                      additionalProperties: { type: 'number' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+<% } %>
+  },
+  components: {
+    schemas: {
+      HealthResponse: {
+        type: 'object',
+        properties: {
+          status: { type: 'string' },
+          uptime: { type: 'number' },
+          timestamp: { type: 'string', format: 'date-time' },
+        },
+      },
+      ErrorResponse: {
+        type: 'object',
+        properties: {
+          error: { type: 'string' },
+          message: { type: 'string' },
+          details: { type: 'object' },
+        },
+      },
+<% if (features.includes('auth') || features.includes('userCrud')) { %>
+      UserRole: {
+        type: 'string',
+        enum: ['admin', 'client'],
+      },
+      User: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          name: { type: 'string' },
+          email: { type: 'string', format: 'email' },
+          role: { $ref: '#/components/schemas/UserRole' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+<% } %>
+<% if (features.includes('auth')) { %>
+      AuthTokens: {
+        type: 'object',
+        properties: {
+          accessToken: { type: 'string' },
+          refreshToken: { type: 'string' },
+        },
+      },
+<% } %>
+    },
+    securitySchemes: {
+<% if (features.includes('auth')) { %>
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+<% } %>
+    },
+  },
+};

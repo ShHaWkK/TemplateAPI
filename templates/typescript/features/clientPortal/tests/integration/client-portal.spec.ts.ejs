@@ -1,0 +1,22 @@
+import request from 'supertest';
+import { buildTestApp } from '../../utils/test-app';
+
+describe('Client portal', () => {
+  it('returns dashboard data for client users', async () => {
+    const app = buildTestApp();
+
+    const loginResponse = await request(app).post('/auth/login').send({
+      email: 'client@example.com',
+      password: 'Client#1234',
+    });
+
+    const { accessToken } = loginResponse.body.tokens;
+
+    const response = await request(app)
+      .get('/client/dashboard')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('stats');
+  });
+});

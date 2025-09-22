@@ -1,0 +1,36 @@
+import { Router } from 'express';
+import { healthController } from '../controllers/health.controller';
+<% if (features.includes('auth')) { %>
+import { authRoutes } from './auth.routes';
+import { profileController } from '../controllers/profile.controller';
+import { ensureAuthenticated } from '../middlewares/ensure-authenticated';
+<% } %>
+<% if (features.includes('userCrud')) { %>
+import { userRoutes } from './user.routes';
+import { requireRole } from '../middlewares/require-role';
+<% } %>
+<% if (features.includes('clientPortal')) { %>
+import { clientPortalRoutes } from './client.routes';
+<% } %>
+<% if (features.includes('adminPortal')) { %>
+import { adminPortalRoutes } from './admin.routes';
+<% } %>
+
+const routes = Router();
+
+routes.get('/health', (request, response) => healthController.handle(request, response));
+<% if (features.includes('auth')) { %>
+routes.use('/auth', authRoutes);
+routes.get('/me', ensureAuthenticated, (request, response) => profileController.handle(request, response));
+<% } %>
+<% if (features.includes('userCrud')) { %>
+routes.use('/users', ensureAuthenticated, requireRole('admin'), userRoutes);
+<% } %>
+<% if (features.includes('clientPortal')) { %>
+routes.use('/client', ensureAuthenticated, requireRole('client'), clientPortalRoutes);
+<% } %>
+<% if (features.includes('adminPortal')) { %>
+routes.use('/admin', ensureAuthenticated, requireRole('admin'), adminPortalRoutes);
+<% } %>
+
+export { routes };
