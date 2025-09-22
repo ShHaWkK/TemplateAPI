@@ -7,6 +7,9 @@ async function bootstrap() {
 
   app.listen(env.API_PORT, () => {
     logger.info(`🚀 ${env.APP_NAME} en écoute sur http://localhost:${env.API_PORT}`);
+    logger.info('✅ Health check : GET /health');
+    logger.info('📊 Statut détaillé : GET /status');
+    logger.info(`📚 Documentation : http://localhost:${env.API_PORT}/docs`);
   });
 }
 

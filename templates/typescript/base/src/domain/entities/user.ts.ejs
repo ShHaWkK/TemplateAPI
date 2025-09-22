@@ -1,0 +1,37 @@
+import crypto from 'node:crypto';
+
+export type UserRole = 'admin' | 'client';
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  passwordHash: string;
+  role: UserRole;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateUserInput {
+  id?: string;
+  name: string;
+  email: string;
+  passwordHash: string;
+  role: UserRole;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export function createUser(input: CreateUserInput): User {
+  const now = new Date();
+
+  return {
+    id: input.id ?? crypto.randomUUID(),
+    name: input.name,
+    email: input.email,
+    passwordHash: input.passwordHash,
+    role: input.role,
+    createdAt: input.createdAt ?? now,
+    updatedAt: input.updatedAt ?? now,
+  };
+}

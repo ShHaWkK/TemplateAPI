@@ -1,0 +1,15 @@
+<% if (features.includes('auth')) { %>
+import { TokenService } from '../../services/token-service';
+
+interface LogoutUserRequest {
+  refreshToken: string;
+}
+
+export class LogoutUserUseCase {
+  constructor(private readonly tokenService: TokenService) {}
+
+  async execute({ refreshToken }: LogoutUserRequest): Promise<void> {
+    await this.tokenService.revokeToken(refreshToken);
+  }
+}
+<% } %>

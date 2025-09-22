@@ -3,7 +3,7 @@ import { buildTestApp } from '../../utils/test-app';
 
 describe('Client portal', () => {
   it('returns dashboard data for client users', async () => {
-    const app = buildTestApp();
+    const app = await buildTestApp();
 
     const loginResponse = await request(app).post('/auth/login').send({
       email: 'client@example.com',

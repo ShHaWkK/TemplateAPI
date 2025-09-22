@@ -1,0 +1,68 @@
+import { DependencyStatus, FeatureDescriptor } from '../../domain/status/system-info';
+
+const features: FeatureDescriptor[] = <%- JSON.stringify(
+  selectedFeatures.map((feature) => ({
+    key: feature.key,
+    name: feature.name,
+    description: feature.description,
+    summary: feature.summary,
+  })),
+  null,
+  2
+) %>;
+
+const dependencies: DependencyStatus[] = [
+  {
+    name: 'http',
+    status: 'ok',
+    details: 'Serveur Express initialisé.',
+  },
+  {
+    name: 'documentation',
+    status: 'ok',
+    details: 'Documentation Swagger disponible sur /docs.',
+  },
+  {
+    name: 'database',
+    status: 'skipped',
+    details: "Aucune base de données n'est configurée par défaut. Ajoutez vos adapters lorsque vous en aurez besoin.",
+  },
+];
+
+<% if (features.includes('auth')) { %>
+dependencies.push({
+  name: 'auth',
+  status: 'ok',
+  details: "Flux d'authentification JWT actif.",
+});
+<% } %>
+<% if (features.includes('userCrud')) { %>
+dependencies.push({
+  name: 'userRepository',
+  status: 'ok',
+  details: 'Gestion CRUD des utilisateurs en mémoire activée.',
+});
+<% } %>
+<% if (features.includes('clientPortal')) { %>
+dependencies.push({
+  name: 'clientPortal',
+  status: 'ok',
+  details: 'Routes client protégées prêtes à l'emploi.',
+});
+<% } %>
+<% if (features.includes('adminPortal')) { %>
+dependencies.push({
+  name: 'adminPortal',
+  status: 'ok',
+  details: 'Endpoints administrateur sécurisés disponibles.',
+});
+<% } %>
+
+export const templateInfo = {
+  projectName: '<%- projectName %>',
+  features,
+  dependencies,
+} as const;
+
+export type GeneratedFeatureDescriptor = (typeof templateInfo.features)[number];
+export type GeneratedDependencyStatus = (typeof templateInfo.dependencies)[number];

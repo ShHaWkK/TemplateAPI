@@ -1,0 +1,26 @@
+<% if (features.includes('auth')) { %>
+import { RefreshToken } from '../../../domain/entities/refresh-token';
+import { RefreshTokenRepository } from '../../../domain/repositories/refresh-token-repository';
+
+export class InMemoryRefreshTokenRepository implements RefreshTokenRepository {
+  private tokens: RefreshToken[] = [];
+
+  async create(token: RefreshToken): Promise<RefreshToken> {
+    this.tokens.push({ ...token });
+    return token;
+  }
+
+  async findByToken(token: string): Promise<RefreshToken | null> {
+    const refreshToken = this.tokens.find((item) => item.token === token);
+    return refreshToken ? { ...refreshToken } : null;
+  }
+
+  async delete(token: string): Promise<void> {
+    this.tokens = this.tokens.filter((item) => item.token !== token);
+  }
+
+  async deleteByUser(userId: string): Promise<void> {
+    this.tokens = this.tokens.filter((item) => item.userId !== userId);
+  }
+}
+<% } %>

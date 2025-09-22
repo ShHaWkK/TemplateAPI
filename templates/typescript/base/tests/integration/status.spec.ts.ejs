@@ -1,0 +1,28 @@
+import request from 'supertest';
+import { buildTestApp } from '../utils/test-app';
+
+describe('API status', () => {
+  it('returns a comprehensive API snapshot', async () => {
+    const app = await buildTestApp();
+
+    const response = await request(app).get('/status');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      status: 'ok',
+      info: {
+        name: expect.any(String),
+        version: expect.any(String),
+        environment: expect.any(String),
+        port: expect.any(Number),
+        nodeVersion: expect.stringMatching(/^v\d+/),
+      },
+      documentation: {
+        openApi: expect.stringContaining('/docs'),
+      },
+    });
+
+    expect(Array.isArray(response.body.features)).toBe(true);
+    expect(Array.isArray(response.body.dependencies)).toBe(true);
+  });
+});

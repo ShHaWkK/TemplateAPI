@@ -10,6 +10,14 @@
       "description": "Collection générée pour tester l'API <%- projectName %>."
     },
     {
+      "_id": "req_status_<%- packageName %>",
+      "_type": "request",
+      "parentId": "wrk_<%- packageName %>",
+      "name": "GET API Status",
+      "method": "GET",
+      "url": "{{ base_url }}/status"
+    },
+    {
       "_id": "req_health_<%- packageName %>",
       "_type": "request",
       "parentId": "wrk_<%- packageName %>",

@@ -1,4 +1,6 @@
 import { logger } from './logging/logger';
+import { ConfigSystemInfoProvider } from './status/config-system-info.provider';
+import { GetApiStatusUseCase } from '../application/use-cases/status/get-api-status.usecase';
 <% if (features.includes('auth')) { %>
 import { InMemoryUserRepository } from './persistence/in-memory/in-memory-user.repository';
 import { InMemoryRefreshTokenRepository } from './persistence/in-memory/in-memory-refresh-token.repository';
@@ -22,6 +24,8 @@ import { DeleteUserUseCase } from '../application/use-cases/users/delete-user.us
 
 class AppContainer {
   readonly logger = logger;
+  readonly systemInfoProvider = new ConfigSystemInfoProvider();
+  readonly statusUseCase = new GetApiStatusUseCase(this.systemInfoProvider);
 <% if (features.includes('auth')) { %>
   readonly userRepository = new InMemoryUserRepository();
   readonly refreshTokenRepository = new InMemoryRefreshTokenRepository();
@@ -31,6 +35,10 @@ class AppContainer {
 }
 
 export const container = new AppContainer();
+
+export function makeGetApiStatusUseCase() {
+  return container.statusUseCase;
+}
 
 <% if (features.includes('auth')) { %>
 async function seedInitialUsers() {
