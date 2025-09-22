@@ -3,7 +3,7 @@ import { buildTestApp } from '../../utils/test-app';
 
 describe('Admin portal', () => {
   it('returns dashboard data for admin users', async () => {
-    const app = buildTestApp();
+    const app = await buildTestApp();
 
     const loginResponse = await request(app).post('/auth/login').send({
       email: 'admin@example.com',

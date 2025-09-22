@@ -1,0 +1,63 @@
+import { SystemInfoProvider } from '../../../domain/status/system-info';
+
+export type ApiStatus = 'ok' | 'degraded';
+
+export interface ApiStatusResponse {
+  status: ApiStatus;
+  timestamp: string;
+  uptimeInSeconds: number;
+  info: {
+    name: string;
+    version: string;
+    environment: string;
+    port: number;
+    nodeVersion: string;
+  };
+  documentation: {
+    openApi: string;
+  };
+  features: Array<{
+    key: string;
+    name: string;
+    summary: string;
+    description: string;
+  }>;
+  dependencies: Array<{
+    name: string;
+    status: 'ok' | 'warning' | 'critical' | 'skipped';
+    details?: string;
+  }>;
+}
+
+export class GetApiStatusUseCase {
+  constructor(private readonly systemInfoProvider: SystemInfoProvider) {}
+
+  async execute(): Promise<ApiStatusResponse> {
+    const snapshot = await this.systemInfoProvider.getSnapshot();
+
+    const hasCriticalDependency = snapshot.dependencies.some((dependency) => dependency.status === 'critical');
+
+    return {
+      status: hasCriticalDependency ? 'degraded' : 'ok',
+      timestamp: new Date().toISOString(),
+      uptimeInSeconds: Math.round(process.uptime()),
+      info: {
+        name: snapshot.name,
+        version: snapshot.version,
+        environment: snapshot.environment,
+        port: snapshot.port,
+        nodeVersion: process.version,
+      },
+      documentation: {
+        openApi: snapshot.documentationUrl,
+      },
+      features: snapshot.features.map((feature) => ({
+        key: feature.key,
+        name: feature.name,
+        summary: feature.summary,
+        description: feature.description,
+      })),
+      dependencies: snapshot.dependencies.map((dependency) => ({ ...dependency })),
+    };
+  }
+}

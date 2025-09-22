@@ -3,7 +3,7 @@ import { buildTestApp } from '../utils/test-app';
 
 describe('Health check', () => {
   it('returns application status', async () => {
-    const app = buildTestApp();
+    const app = await buildTestApp();
 
     const response = await request(app).get('/health');
 

@@ -7,6 +7,7 @@ Généré avec **create-template-api** le <%- createdAt %>.
 - Sécurité HTTP (Helmet, CORS, rate limiting) et logging Pino.
 - Validation des entrées avec Zod et middleware de gestion d'erreurs.
 - Documentation OpenAPI servie sur `/docs` et collection Insomnia.
+- Endpoint de diagnostic `/status` détaillant l'état de l'API et des fonctionnalités actives.
 <% if (featureSummaries.length) { %>
 <% featureSummaries.forEach((summary) => { %>- <%- summary %>
 <% }); %>
@@ -31,6 +32,43 @@ Chaque couche ne dépend que de la précédente afin de garantir testabilité et
 <%- packageManagerCommands.run %> dev
 ```
 
+### Vérification rapide
+
+```bash
+curl http://localhost:3333/status
+```
+
+Vous obtenez un instantané JSON avec l'état global, les fonctionnalités activées, les dépendances simulées
+et les liens utiles. Pour un simple ping, `GET /health` reste disponible.
+<% if (features.includes('auth')) { %>
+
+### Scénario d'authentification prêt à l'emploi
+
+Deux comptes de démonstration sont préchargés :
+
+| Email | Mot de passe | Rôle |
+| ----- | ------------ | ---- |
+| `admin@example.com` | `Admin#1234` | admin |
+| `client@example.com` | `Client#1234` | client |
+
+Inscrivez un utilisateur, connectez-vous et rafraîchissez votre token sans écrire de code :
+
+```bash
+# Inscription
+curl -X POST http://localhost:3333/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Ada","email":"ada@example.com","password":"Str0ng#Pass"}'
+
+# Connexion administrateur (nécessite jq pour extraire le token)
+ACCESS_TOKEN=$(curl -s -X POST http://localhost:3333/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"Admin#1234"}' | jq -r '.tokens.accessToken')
+
+# Profil courant
+curl -H "Authorization: Bearer ${ACCESS_TOKEN}" http://localhost:3333/me
+```
+<% } %>
+
 ### Principaux scripts
 
 | Script | Commande |
@@ -42,6 +80,7 @@ Chaque couche ne dépend que de la précédente afin de garantir testabilité et
 
 - Swagger/OpenAPI disponible sur [`/docs`](http://localhost:3333/docs).
 - Collection Insomnia générée dans `docs/insomnia/collection.json`.
+- Aperçu temps réel sur [`/status`](http://localhost:3333/status).
 
 ## 🧪 Tests
 

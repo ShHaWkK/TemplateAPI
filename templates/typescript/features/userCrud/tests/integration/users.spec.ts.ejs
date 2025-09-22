@@ -3,7 +3,7 @@ import { buildTestApp } from '../../utils/test-app';
 
 describe('User administration', () => {
   async function authenticateAdmin() {
-    const app = buildTestApp();
+    const app = await buildTestApp();
     const response = await request(app).post('/auth/login').send({
       email: 'admin@example.com',
       password: 'Admin#1234',

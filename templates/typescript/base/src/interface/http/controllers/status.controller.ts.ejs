@@ -1,0 +1,13 @@
+import { Request, Response } from 'express';
+import { makeGetApiStatusUseCase } from '../../../infrastructure/container';
+
+class StatusController {
+  async handle(_request: Request, response: Response) {
+    const useCase = makeGetApiStatusUseCase();
+    const payload = await useCase.execute();
+
+    return response.json(payload);
+  }
+}
+
+export const statusController = new StatusController();

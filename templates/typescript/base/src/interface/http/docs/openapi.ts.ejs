@@ -25,6 +25,22 @@ export const openApiDocument: OpenAPIV3.Document = {
 <% } %>
   ],
   paths: {
+    '/status': {
+      get: {
+        tags: ['Health'],
+        summary: "Retourne un instantané détaillé de l'API",
+        responses: {
+          '200': {
+            description: 'Statut complet du service',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ApiStatus' },
+              },
+            },
+          },
+        },
+      },
+    },
     '/health': {
       get: {
         tags: ['Health'],
@@ -34,14 +50,7 @@ export const openApiDocument: OpenAPIV3.Document = {
             description: 'Santé du service',
             content: {
               'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    status: { type: 'string' },
-                    uptime: { type: 'number' },
-                    timestamp: { type: 'string', format: 'date-time' },
-                  },
-                },
+                schema: { $ref: '#/components/schemas/HealthResponse' },
               },
             },
           },
@@ -366,6 +375,55 @@ export const openApiDocument: OpenAPIV3.Document = {
   },
   components: {
     schemas: {
+      DependencyStatus: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          status: { type: 'string', enum: ['ok', 'warning', 'critical', 'skipped'] },
+          details: { type: 'string' },
+        },
+      },
+      FeatureFlag: {
+        type: 'object',
+        properties: {
+          key: { type: 'string' },
+          name: { type: 'string' },
+          summary: { type: 'string' },
+          description: { type: 'string' },
+        },
+      },
+      ApiStatus: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', enum: ['ok', 'degraded'] },
+          timestamp: { type: 'string', format: 'date-time' },
+          uptimeInSeconds: { type: 'number' },
+          info: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              version: { type: 'string' },
+              environment: { type: 'string' },
+              port: { type: 'number' },
+              nodeVersion: { type: 'string' },
+            },
+          },
+          documentation: {
+            type: 'object',
+            properties: {
+              openApi: { type: 'string' },
+            },
+          },
+          features: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/FeatureFlag' },
+          },
+          dependencies: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/DependencyStatus' },
+          },
+        },
+      },
       HealthResponse: {
         type: 'object',
         properties: {
