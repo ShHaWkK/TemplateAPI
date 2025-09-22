@@ -1,0 +1,8 @@
+import { RefreshToken } from '../entities/refresh-token';
+
+export interface RefreshTokenRepository {
+  create(token: RefreshToken): Promise<RefreshToken>;
+  findByToken(token: string): Promise<RefreshToken | null>;
+  delete(token: string): Promise<void>;
+  deleteByUser(userId: string): Promise<void>;
+}

@@ -1,0 +1,11 @@
+import { UserRepository } from '../../../domain/repositories/user-repository';
+import { User } from '../../../domain/entities/user';
+
+export class ListUsersUseCase {
+  constructor(private readonly userRepository: UserRepository) {}
+
+  async execute(): Promise<{ users: User[] }> {
+    const users = await this.userRepository.list();
+    return { users };
+  }
+}

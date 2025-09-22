@@ -1,0 +1,58 @@
+import { Request, Response } from 'express';
+import {
+  makeCreateUserUseCase,
+  makeDeleteUserUseCase,
+  makeGetUserUseCase,
+  makeListUsersUseCase,
+  makeUpdateUserUseCase,
+} from '../../../infrastructure/container';
+import { userPresenter } from '../presenters/user.presenter';
+
+class UserController {
+  async index(_request: Request, response: Response) {
+    const listUsers = makeListUsersUseCase();
+    const result = await listUsers.execute();
+
+    return response.status(200).json({
+      users: result.users.map((user) => userPresenter.toHttp(user)),
+    });
+  }
+
+  async show(request: Request, response: Response) {
+    const getUser = makeGetUserUseCase();
+    const user = await getUser.execute({ userId: request.params.userId });
+
+    return response.status(200).json(userPresenter.toHttp(user));
+  }
+
+  async create(request: Request, response: Response) {
+    const { name, email, password, role } = request.body;
+    const createUser = makeCreateUserUseCase();
+    const user = await createUser.execute({ name, email, password, role });
+
+    return response.status(201).json(userPresenter.toHttp(user));
+  }
+
+  async update(request: Request, response: Response) {
+    const { name, email, password, role } = request.body;
+    const updateUser = makeUpdateUserUseCase();
+    const user = await updateUser.execute({
+      userId: request.params.userId,
+      name,
+      email,
+      password,
+      role,
+    });
+
+    return response.status(200).json(userPresenter.toHttp(user));
+  }
+
+  async delete(request: Request, response: Response) {
+    const deleteUser = makeDeleteUserUseCase();
+    await deleteUser.execute({ userId: request.params.userId });
+
+    return response.status(204).send();
+  }
+}
+
+export const userController = new UserController();

@@ -1,0 +1,7 @@
+import { Express } from 'express';
+import swaggerUi from 'swagger-ui-express';
+import { openApiDocument } from './openapi';
+
+export function registerDocs(app: Express) {
+  app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiDocument));
+}

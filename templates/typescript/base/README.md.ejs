@@ -1,0 +1,70 @@
+# <%- projectName %>
+
+Généré avec **create-template-api** le <%- createdAt %>.
+
+## 🚀 Modules inclus
+
+- Sécurité HTTP (Helmet, CORS, rate limiting) et logging Pino.
+- Validation des entrées avec Zod et middleware de gestion d'erreurs.
+- Documentation OpenAPI servie sur `/docs` et collection Insomnia.
+<% if (featureSummaries.length) { %>
+<% featureSummaries.forEach((summary) => { %>- <%- summary %>
+<% }); %>
+<% } %>
+
+## 🗂 Architecture hexagonale
+
+```
+src/
+├── domain/           # Modèle métier et contrats
+├── application/      # Cas d'usage, services et erreurs
+├── infrastructure/   # Adapters, configuration et conteneur d'injection
+└── interface/http/   # Routes, contrôleurs, middlewares, docs et DTOs
+```
+
+Chaque couche ne dépend que de la précédente afin de garantir testabilité et évolutivité.
+
+## 🔧 Installation & exécution
+
+```bash
+<%- packageManagerCommands.install %>
+<%- packageManagerCommands.run %> dev
+```
+
+### Principaux scripts
+
+| Script | Commande |
+| ------ | -------- |
+<% Object.entries(scripts).forEach(([name, command]) => { %>| <%- name %> | `<%- command %>` |
+<% }); %>
+
+## 📚 Documentation
+
+- Swagger/OpenAPI disponible sur [`/docs`](http://localhost:3333/docs).
+- Collection Insomnia générée dans `docs/insomnia/collection.json`.
+
+## 🧪 Tests
+
+```bash
+<%- packageManagerCommands.run %> test
+```
+
+Les tests reposent sur Jest et Supertest. Des doubles in-memory permettent d'isoler les cas d'usage des dépendances.
+
+## 🛡 Sécurité & bonnes pratiques
+
+- Middleware globaux : Helmet, CORS configurables, rate limiting.
+- Journalisation structurée via Pino (pretty logging en développement).
+- Validation centralisée avec Zod et réponses d'erreur normalisées.
+<% if (features.includes('auth')) { %>- Tokens JWT signés, rotation de refresh token et hashage des mots de passe.
+<% } %>
+<% if (features.includes('clientPortal') || features.includes('adminPortal')) { %>- Contrôle d'accès basé sur les rôles pour les espaces dédiés.
+<% } %>
+
+## ▶️ Aller plus loin
+
+- Ajoutez de nouveaux cas d'usage dans `src/application/use-cases`.
+- Implémentez vos propres adaptateurs (email, files, etc.) dans `src/infrastructure`.
+- Étendez la documentation via `src/interface/http/docs/openapi.ts`.
+
+Bon développement ! 🚀

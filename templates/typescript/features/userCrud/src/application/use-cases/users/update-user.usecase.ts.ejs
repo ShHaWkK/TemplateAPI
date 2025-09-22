@@ -1,0 +1,54 @@
+import { ConflictError } from '../../errors/conflict-error';
+import { NotFoundError } from '../../errors/not-found-error';
+import { UserRepository } from '../../../domain/repositories/user-repository';
+import { PasswordHasher } from '../../services/password-hasher';
+import { UserRole } from '../../../domain/entities/user';
+
+interface UpdateUserRequest {
+  userId: string;
+  name?: string;
+  email?: string;
+  password?: string;
+  role?: UserRole;
+}
+
+export class UpdateUserUseCase {
+  constructor(
+    private readonly userRepository: UserRepository,
+    private readonly passwordHasher: PasswordHasher
+  ) {}
+
+  async execute({ userId, name, email, password, role }: UpdateUserRequest) {
+    const user = await this.userRepository.findById(userId);
+
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    if (email && email !== user.email) {
+      const exists = await this.userRepository.findByEmail(email);
+      if (exists && exists.id !== userId) {
+        throw new ConflictError('Email already registered');
+      }
+      user.email = email;
+    }
+
+    if (name) {
+      user.name = name;
+    }
+
+    if (role) {
+      user.role = role;
+    }
+
+    if (password) {
+      user.passwordHash = await this.passwordHasher.hash(password);
+    }
+
+    user.updatedAt = new Date();
+
+    await this.userRepository.update(user);
+
+    return user;
+  }
+}

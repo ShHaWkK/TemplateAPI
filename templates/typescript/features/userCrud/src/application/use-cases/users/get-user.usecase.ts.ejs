@@ -1,0 +1,21 @@
+import { NotFoundError } from '../../errors/not-found-error';
+import { UserRepository } from '../../../domain/repositories/user-repository';
+import { User } from '../../../domain/entities/user';
+
+interface GetUserRequest {
+  userId: string;
+}
+
+export class GetUserUseCase {
+  constructor(private readonly userRepository: UserRepository) {}
+
+  async execute({ userId }: GetUserRequest): Promise<User> {
+    const user = await this.userRepository.findById(userId);
+
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    return user;
+  }
+}

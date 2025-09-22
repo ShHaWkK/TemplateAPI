@@ -1,0 +1,37 @@
+import request from 'supertest';
+import { buildTestApp } from '../../utils/test-app';
+
+describe('User administration', () => {
+  async function authenticateAdmin() {
+    const app = buildTestApp();
+    const response = await request(app).post('/auth/login').send({
+      email: 'admin@example.com',
+      password: 'Admin#1234',
+    });
+
+    return { app, token: response.body.tokens.accessToken };
+  }
+
+  it('allows an admin to list and create users', async () => {
+    const { app, token } = await authenticateAdmin();
+
+    const createResponse = await request(app)
+      .post('/users')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'New Client',
+        email: 'new-client@example.com',
+        password: 'Client#1234',
+        role: 'client',
+      });
+
+    expect(createResponse.status).toBe(201);
+
+    const listResponse = await request(app)
+      .get('/users')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(listResponse.status).toBe(200);
+    expect(Array.isArray(listResponse.body.users)).toBe(true);
+  });
+});

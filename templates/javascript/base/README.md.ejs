@@ -1,0 +1,58 @@
+# <%- projectName %>
+
+Généré avec **create-template-api** le <%- createdAt %>.
+
+## 🚀 Modules inclus
+
+- Express configuré avec Helmet, CORS, rate limiting et logging Pino.
+- Validation des entrées via Zod et gestion centralisée des erreurs.
+- Documentation OpenAPI servie sur `/docs` et collection Insomnia.
+<% if (featureSummaries.length) { %>
+<% featureSummaries.forEach((summary) => { %>- <%- summary %>
+<% }); %>
+<% } %>
+
+## 🗂 Architecture hexagonale
+
+```
+src/
+├── domain/           # Modèle métier et contrats
+├── application/      # Cas d'usage, services, erreurs
+├── infrastructure/   # Adaptateurs techniques & conteneur
+└── interface/http/   # Routes, contrôleurs, middlewares, docs
+```
+
+## 🔧 Installation & exécution
+
+```bash
+<%- packageManagerCommands.install %>
+<%- packageManagerCommands.run %> dev
+```
+
+### Scripts utiles
+
+| Script | Commande |
+| ------ | -------- |
+<% Object.entries(scripts).forEach(([name, command]) => { %>| <%- name %> | `<%- command %>` |
+<% }); %>
+
+## 📚 Documentation
+
+- Swagger/OpenAPI sur [`/docs`](http://localhost:3333/docs)
+- Collection Insomnia : `docs/insomnia/collection.json`
+
+## 🧪 Tests
+
+```bash
+<%- packageManagerCommands.run %> test
+```
+
+## 🛡 Bonnes pratiques
+
+- Middleware de sécurité activés par défaut
+- Logs structurés via Pino + Pino-pretty en développement
+- Validation d'entrée systématique et réponses d'erreur homogènes
+<% if (features.includes('auth')) { %>- Authentification JWT + rotation de refresh token
+<% } %>
+
+Bon développement ! 🚀

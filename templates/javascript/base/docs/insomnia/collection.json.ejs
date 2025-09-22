@@ -1,0 +1,124 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "<%- createdAt %>",
+  "resources": [
+    {
+      "_id": "wrk_<%- packageName %>",
+      "_type": "workspace",
+      "name": "<%- projectName %>",
+      "description": "Collection générée pour tester l'API <%- projectName %>."
+    },
+    {
+      "_id": "req_health_<%- packageName %>",
+      "_type": "request",
+      "parentId": "wrk_<%- packageName %>",
+      "name": "GET Health",
+      "method": "GET",
+      "url": "{{ base_url }}/health"
+    }
+<% if (features.includes('auth')) { %>
+    ,{
+      "_id": "req_register_<%- packageName %>",
+      "_type": "request",
+      "parentId": "wrk_<%- packageName %>",
+      "name": "POST Register",
+      "method": "POST",
+      "url": "{{ base_url }}/auth/register",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Ada Lovelace\",\n  \"email\": \"ada@example.com\",\n  \"password\": \"Str0ng#Pass\"\n}"
+      }
+    },
+    {
+      "_id": "req_login_<%- packageName %>",
+      "_type": "request",
+      "parentId": "wrk_<%- packageName %>",
+      "name": "POST Login",
+      "method": "POST",
+      "url": "{{ base_url }}/auth/login",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"ada@example.com\",\n  \"password\": \"Str0ng#Pass\"\n}"
+      }
+    },
+    {
+      "_id": "req_refresh_<%- packageName %>",
+      "_type": "request",
+      "parentId": "wrk_<%- packageName %>",
+      "name": "POST Refresh",
+      "method": "POST",
+      "url": "{{ base_url }}/auth/refresh",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"refreshToken\": \"<refreshToken>\"\n}"
+      }
+    },
+    {
+      "_id": "req_me_<%- packageName %>",
+      "_type": "request",
+      "parentId": "wrk_<%- packageName %>",
+      "name": "GET Profile",
+      "method": "GET",
+      "url": "{{ base_url }}/me",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer <accessToken>" }
+      ]
+    }
+<% } %>
+<% if (features.includes('userCrud')) { %>
+    ,{
+      "_id": "req_users_list_<%- packageName %>",
+      "_type": "request",
+      "parentId": "wrk_<%- packageName %>",
+      "name": "GET Users",
+      "method": "GET",
+      "url": "{{ base_url }}/users",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer <adminToken>" }
+      ]
+    },
+    {
+      "_id": "req_users_create_<%- packageName %>",
+      "_type": "request",
+      "parentId": "wrk_<%- packageName %>",
+      "name": "POST User",
+      "method": "POST",
+      "url": "{{ base_url }}/users",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer <adminToken>" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"New User\",\n  \"email\": \"new@example.com\",\n  \"password\": \"Temp#1234\",\n  \"role\": \"client\"\n}"
+      }
+    }
+<% } %>
+<% if (features.includes('clientPortal')) { %>
+    ,{
+      "_id": "req_client_dashboard_<%- packageName %>",
+      "_type": "request",
+      "parentId": "wrk_<%- packageName %>",
+      "name": "GET Client Dashboard",
+      "method": "GET",
+      "url": "{{ base_url }}/client/dashboard",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer <clientToken>" }
+      ]
+    }
+<% } %>
+<% if (features.includes('adminPortal')) { %>
+    ,{
+      "_id": "req_admin_dashboard_<%- packageName %>",
+      "_type": "request",
+      "parentId": "wrk_<%- packageName %>",
+      "name": "GET Admin Dashboard",
+      "method": "GET",
+      "url": "{{ base_url }}/admin/dashboard",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer <adminToken>" }
+      ]
+    }
+<% } %>
+  ]
+}

@@ -1,0 +1,44 @@
+import { User } from '../../../domain/entities/user';
+import { UserRepository } from '../../../domain/repositories/user-repository';
+
+export class InMemoryUserRepository implements UserRepository {
+  private users: User[] = [];
+
+  constructor(seedUsers: User[] = []) {
+    this.users = seedUsers.map((user) => ({ ...user }));
+  }
+
+  async create(user: User): Promise<User> {
+    this.users.push({ ...user });
+    return user;
+  }
+
+  async update(user: User): Promise<User> {
+    const index = this.users.findIndex((item) => item.id === user.id);
+
+    if (index === -1) {
+      throw new Error('User not found');
+    }
+
+    this.users[index] = { ...user, updatedAt: new Date() };
+    return this.users[index];
+  }
+
+  async delete(userId: string): Promise<void> {
+    this.users = this.users.filter((user) => user.id !== userId);
+  }
+
+  async findById(userId: string): Promise<User | null> {
+    const user = this.users.find((item) => item.id === userId);
+    return user ? { ...user } : null;
+  }
+
+  async findByEmail(email: string): Promise<User | null> {
+    const user = this.users.find((item) => item.email.toLowerCase() === email.toLowerCase());
+    return user ? { ...user } : null;
+  }
+
+  async list(): Promise<User[]> {
+    return this.users.map((user) => ({ ...user }));
+  }
+}

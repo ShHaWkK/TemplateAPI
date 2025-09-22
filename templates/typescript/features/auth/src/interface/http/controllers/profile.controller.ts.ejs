@@ -1,0 +1,16 @@
+import { Request, Response } from 'express';
+import { makeGetProfileUseCase } from '../../../infrastructure/container';
+import { userPresenter } from '../presenters/user.presenter';
+
+class ProfileController {
+  async handle(request: Request, response: Response) {
+    const currentUser = request.user;
+
+    const getProfile = makeGetProfileUseCase();
+    const user = await getProfile.execute({ userId: currentUser.id });
+
+    return response.status(200).json(userPresenter.toHttp(user));
+  }
+}
+
+export const profileController = new ProfileController();

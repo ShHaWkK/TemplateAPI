@@ -1,0 +1,16 @@
+import { UserRole } from '../../domain/entities/user';
+
+declare global {
+  namespace Express {
+    interface AuthenticatedUser {
+      id: string;
+      role: UserRole;
+    }
+
+    interface Request {
+      user: AuthenticatedUser;
+    }
+  }
+}
+
+export {};

@@ -1,0 +1,38 @@
+import { Router } from 'express';
+import { userController } from '../controllers/user.controller';
+import { asyncHandler } from '../../utils/async-handler';
+import { validateRequest } from '../middlewares/validate-request';
+import {
+  createUserSchema,
+  getUserSchema,
+  updateUserSchema,
+  deleteUserSchema,
+} from '../validators/user.validators';
+
+export const userRoutes = Router();
+
+userRoutes.get('/', asyncHandler((request, response) => userController.index(request, response)));
+
+userRoutes.post(
+  '/',
+  validateRequest(createUserSchema),
+  asyncHandler((request, response) => userController.create(request, response))
+);
+
+userRoutes.get(
+  '/:userId',
+  validateRequest(getUserSchema),
+  asyncHandler((request, response) => userController.show(request, response))
+);
+
+userRoutes.patch(
+  '/:userId',
+  validateRequest(updateUserSchema),
+  asyncHandler((request, response) => userController.update(request, response))
+);
+
+userRoutes.delete(
+  '/:userId',
+  validateRequest(deleteUserSchema),
+  asyncHandler((request, response) => userController.delete(request, response))
+);

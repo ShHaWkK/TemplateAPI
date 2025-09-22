@@ -1,0 +1,114 @@
+import { logger } from './logging/logger';
+<% if (features.includes('auth')) { %>
+import { InMemoryUserRepository } from './persistence/in-memory/in-memory-user.repository';
+import { InMemoryRefreshTokenRepository } from './persistence/in-memory/in-memory-refresh-token.repository';
+import { BcryptPasswordHasher } from './hashing/bcrypt-password-hasher';
+import { JwtTokenService } from './auth/jwt-token.service';
+import { RegisterUserUseCase } from '../application/use-cases/auth/register-user.usecase';
+import { AuthenticateUserUseCase } from '../application/use-cases/auth/authenticate-user.usecase';
+import { RefreshTokenUseCase } from '../application/use-cases/auth/refresh-token.usecase';
+import { LogoutUserUseCase } from '../application/use-cases/auth/logout-user.usecase';
+import { GetProfileUseCase } from '../application/use-cases/auth/get-profile.usecase';
+import { createUser } from '../domain/entities/user';
+import bcrypt from 'bcryptjs';
+<% if (features.includes('userCrud')) { %>
+import { ListUsersUseCase } from '../application/use-cases/users/list-users.usecase';
+import { GetUserUseCase } from '../application/use-cases/users/get-user.usecase';
+import { CreateUserUseCase } from '../application/use-cases/users/create-user.usecase';
+import { UpdateUserUseCase } from '../application/use-cases/users/update-user.usecase';
+import { DeleteUserUseCase } from '../application/use-cases/users/delete-user.usecase';
+<% } %>
+<% } %>
+
+class AppContainer {
+  readonly logger = logger;
+<% if (features.includes('auth')) { %>
+  readonly userRepository = new InMemoryUserRepository();
+  readonly refreshTokenRepository = new InMemoryRefreshTokenRepository();
+  readonly passwordHasher = new BcryptPasswordHasher();
+  readonly tokenService = new JwtTokenService(this.refreshTokenRepository, this.userRepository);
+<% } %>
+}
+
+export const container = new AppContainer();
+
+<% if (features.includes('auth')) { %>
+async function seedInitialUsers() {
+  const users = await container.userRepository.list();
+
+  if (users.length === 0) {
+    const adminPassword = bcrypt.hashSync('Admin#1234', 10);
+    const clientPassword = bcrypt.hashSync('Client#1234', 10);
+
+    await container.userRepository.create(
+      createUser({
+        name: 'Administrator',
+        email: 'admin@example.com',
+        passwordHash: adminPassword,
+        role: 'admin',
+      })
+    );
+
+    await container.userRepository.create(
+      createUser({
+        name: 'Client Demo',
+        email: 'client@example.com',
+        passwordHash: clientPassword,
+        role: 'client',
+      })
+    );
+  }
+}
+
+export const containerReady = seedInitialUsers();
+
+export function makeRegisterUserUseCase() {
+  return new RegisterUserUseCase(container.userRepository, container.passwordHasher, container.tokenService);
+}
+
+export function makeAuthenticateUserUseCase() {
+  return new AuthenticateUserUseCase(container.userRepository, container.passwordHasher, container.tokenService);
+}
+
+export function makeRefreshTokenUseCase() {
+  return new RefreshTokenUseCase(container.tokenService);
+}
+
+export function makeLogoutUserUseCase() {
+  return new LogoutUserUseCase(container.tokenService);
+}
+
+export function makeGetProfileUseCase() {
+  return new GetProfileUseCase(container.userRepository);
+}
+
+export function resolveTokenService() {
+  return container.tokenService;
+}
+
+export function resolveUserRepository() {
+  return container.userRepository;
+}
+
+<% if (features.includes('userCrud')) { %>
+export function makeListUsersUseCase() {
+  return new ListUsersUseCase(container.userRepository);
+}
+
+export function makeGetUserUseCase() {
+  return new GetUserUseCase(container.userRepository);
+}
+
+export function makeCreateUserUseCase() {
+  return new CreateUserUseCase(container.userRepository, container.passwordHasher);
+}
+
+export function makeUpdateUserUseCase() {
+  return new UpdateUserUseCase(container.userRepository, container.passwordHasher);
+}
+
+export function makeDeleteUserUseCase() {
+  return new DeleteUserUseCase(container.userRepository, container.refreshTokenRepository);
+}
+<% } %>
+<% } %>

@@ -1,0 +1,32 @@
+import { ConflictError } from '../../errors/conflict-error';
+import { UserRepository } from '../../../domain/repositories/user-repository';
+import { PasswordHasher } from '../../services/password-hasher';
+import { createUser, User, UserRole } from '../../../domain/entities/user';
+
+interface CreateUserRequest {
+  name: string;
+  email: string;
+  password: string;
+  role: UserRole;
+}
+
+export class CreateUserUseCase {
+  constructor(
+    private readonly userRepository: UserRepository,
+    private readonly passwordHasher: PasswordHasher
+  ) {}
+
+  async execute({ name, email, password, role }: CreateUserRequest): Promise<User> {
+    const existing = await this.userRepository.findByEmail(email);
+
+    if (existing) {
+      throw new ConflictError('Email already registered');
+    }
+
+    const passwordHash = await this.passwordHasher.hash(password);
+    const user = createUser({ name, email, passwordHash, role });
+
+    await this.userRepository.create(user);
+    return user;
+  }
+}

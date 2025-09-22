@@ -1,0 +1,50 @@
+import { Request, Response } from 'express';
+import {
+  makeAuthenticateUserUseCase,
+  makeRefreshTokenUseCase,
+  makeRegisterUserUseCase,
+  makeLogoutUserUseCase,
+} from '../../../infrastructure/container';
+import { userPresenter } from '../presenters/user.presenter';
+
+class AuthController {
+  async register(request: Request, response: Response) {
+    const { name, email, password, role } = request.body;
+    const registerUser = makeRegisterUserUseCase();
+    const result = await registerUser.execute({ name, email, password, role });
+
+    return response.status(201).json({
+      user: userPresenter.toHttp(result.user),
+      tokens: result.tokens,
+    });
+  }
+
+  async login(request: Request, response: Response) {
+    const { email, password } = request.body;
+    const authenticateUser = makeAuthenticateUserUseCase();
+    const result = await authenticateUser.execute({ email, password });
+
+    return response.status(200).json({
+      user: userPresenter.toHttp(result.user),
+      tokens: result.tokens,
+    });
+  }
+
+  async refresh(request: Request, response: Response) {
+    const { refreshToken } = request.body;
+    const refreshTokenUseCase = makeRefreshTokenUseCase();
+    const tokens = await refreshTokenUseCase.execute({ refreshToken });
+
+    return response.status(200).json(tokens);
+  }
+
+  async logout(request: Request, response: Response) {
+    const { refreshToken } = request.body;
+    const logoutUseCase = makeLogoutUserUseCase();
+    await logoutUseCase.execute({ refreshToken });
+
+    return response.status(204).send();
+  }
+}
+
+export const authController = new AuthController();

@@ -1,0 +1,39 @@
+import { NextFunction, Request, Response } from 'express';
+import { ZodError } from 'zod';
+import { ApplicationError } from '../../../application/errors/application-error';
+import { ValidationError } from '../../../application/errors/validation-error';
+import { logger } from '../../../infrastructure/logging/logger';
+
+export function errorHandler(error: unknown, _request: Request, response: Response, _next: NextFunction) {
+  if (error instanceof ValidationError) {
+    return response.status(error.statusCode).json({
+      error: 'validation_error',
+      message: error.message,
+      details: error.context,
+    });
+  }
+
+  if (error instanceof ZodError) {
+    const validationError = new ValidationError(error);
+    return response.status(validationError.statusCode).json({
+      error: 'validation_error',
+      message: validationError.message,
+      details: validationError.context,
+    });
+  }
+
+  if (error instanceof ApplicationError) {
+    return response.status(error.statusCode).json({
+      error: 'application_error',
+      message: error.message,
+      details: error.context,
+    });
+  }
+
+  logger.error(error, 'Unhandled error');
+
+  return response.status(500).json({
+    error: 'internal_server_error',
+    message: 'An unexpected error occurred.',
+  });
+}

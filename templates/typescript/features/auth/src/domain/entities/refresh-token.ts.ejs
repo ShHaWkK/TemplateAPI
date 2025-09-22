@@ -1,0 +1,29 @@
+import crypto from 'node:crypto';
+
+export interface RefreshToken {
+  id: string;
+  userId: string;
+  token: string;
+  expiresAt: Date;
+  createdAt: Date;
+  revokedAt?: Date | null;
+}
+
+export interface CreateRefreshTokenInput {
+  id?: string;
+  userId: string;
+  token: string;
+  expiresAt: Date;
+  createdAt?: Date;
+}
+
+export function createRefreshToken(input: CreateRefreshTokenInput): RefreshToken {
+  return {
+    id: input.id ?? crypto.randomUUID(),
+    userId: input.userId,
+    token: input.token,
+    expiresAt: input.expiresAt,
+    createdAt: input.createdAt ?? new Date(),
+    revokedAt: null,
+  };
+}

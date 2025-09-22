@@ -1,0 +1,6 @@
+export class ApplicationError extends Error {
+  constructor(message: string, public readonly statusCode = 400, public readonly context?: unknown) {
+    super(message);
+    this.name = 'ApplicationError';
+  }
+}

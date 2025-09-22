@@ -1,0 +1,16 @@
+import { Request, Response } from 'express';
+
+class AdminPortalController {
+  async dashboard(_request: Request, response: Response) {
+    return response.status(200).json({
+      message: 'Tableau de bord administrateur',
+      metrics: {
+        users: 128,
+        activeClients: 54,
+        monthlyRevenue: 12345,
+      },
+    });
+  }
+}
+
+export const adminPortalController = new AdminPortalController();
