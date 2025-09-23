@@ -7,21 +7,6 @@
                          | |                                                 
                          |_|                                
 ```
-                         
-**create-template-api** est un générateur interactif de bases d'API Node.js prêtes pour la production.
-Il permet de sélectionner dynamiquement le langage (TypeScript ou JavaScript) ainsi que les modules
-fonctionnels (authentification JWT, gestion d'utilisateurs, espaces client / admin, etc.) sans
-aucune dépendance à une base de données.
-
-## ✨ Points clés
-
-- Architecture hexagonale complète : `domain`, `application`, `infrastructure`, `interface`.
-- Sécurité HTTP (Helmet, CORS, rate limiting) et logging structuré (Pino) préconfigurés.
-- Validation des entrées avec Zod et gestion centralisée des erreurs.
-- Authentification JWT avec refresh token rotatif, hashage bcrypt et rôles (admin / client).
-- Documentation OpenAPI + collection Insomnia générées automatiquement.
-- Tests prêts à l'emploi (Jest + Supertest) avec dépôts en mémoire.
-- Dockerfile, docker-compose et scripts npm pour un onboarding immédiat.
 
 ## 🚀 Utilisation
 
