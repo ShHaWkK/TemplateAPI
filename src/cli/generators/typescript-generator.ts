@@ -1,7 +1,7 @@
 import path from 'node:path';
 import fs from 'fs-extra';
 import { BaseTemplateGenerator, GenerateProjectOptions, TemplateDependencies } from './base-generator';
-import { FeatureKey, Language } from './types';
+import { DataProviderKey, FeatureKey, Language } from './types';
 
 const templateRoot = path.resolve(__dirname, '../../..', 'templates', 'typescript');
 
@@ -19,7 +19,11 @@ export class TypeScriptTemplateGenerator extends BaseTemplateGenerator {
     return fs.existsSync(featurePath) ? featurePath : undefined;
   }
 
-  protected buildDependencies(_language: Language, features: FeatureKey[]): TemplateDependencies {
+  protected buildDependencies(
+    _language: Language,
+    features: FeatureKey[],
+    dataProviders: DataProviderKey[]
+  ): TemplateDependencies {
     const dependencies = [
       { name: 'cors', version: '^2.8.5' },
       { name: 'dotenv', version: '^16.4.1' },
@@ -61,15 +65,46 @@ export class TypeScriptTemplateGenerator extends BaseTemplateGenerator {
       devDependencies.push({ name: '@types/jsonwebtoken', version: '^9.0.6' });
     }
 
+    for (const provider of dataProviders) {
+      if (provider === 'postgresql') {
+        dependencies.push({ name: 'pg', version: '^8.11.3' });
+        devDependencies.push({ name: '@types/pg', version: '^8.10.6' });
+      }
+
+      if (provider === 'mysql') {
+        dependencies.push({ name: 'mysql2', version: '^3.9.7' });
+      }
+
+      if (provider === 'sqlite') {
+        dependencies.push({ name: 'better-sqlite3', version: '^9.4.5' });
+      }
+
+      if (provider === 'prisma') {
+        dependencies.push({ name: '@prisma/client', version: '^5.10.2' });
+        devDependencies.push({ name: 'prisma', version: '^5.10.2' });
+      }
+
+      if (provider === 's3') {
+        dependencies.push({ name: '@aws-sdk/client-s3', version: '^3.550.0' });
+      }
+    }
+
     const scripts: Record<string, string> = {
       dev: 'ts-node-dev --respawn --transpile-only --ignore-watch node_modules --no-notify src/server.ts',
       build: 'tsc -p tsconfig.json',
       start: 'node dist/server.js',
       test: 'jest --passWithNoTests',
       'test:watch': 'jest --watch',
-      lint: 'eslint "src/**/*.{ts,tsx}"',
-      format: 'prettier --write "src/**/*.{ts,tsx}"',
+      lint: 'eslint "src/**/*.ts"',
+      format: 'prettier --write "src/**/*.ts"',
+      api: 'ts-node scripts/api-cli.ts',
     };
+
+    if (dataProviders.includes('prisma')) {
+      scripts['prisma:generate'] = 'prisma generate';
+      scripts['prisma:migrate'] = 'prisma migrate dev';
+      scripts['prisma:studio'] = 'prisma studio';
+    }
 
     return {
       dependencies,
@@ -85,6 +120,9 @@ export class TypeScriptTemplateGenerator extends BaseTemplateGenerator {
       hasUserCrud: options.features.includes('userCrud'),
       hasClientPortal: options.features.includes('clientPortal'),
       hasAdminPortal: options.features.includes('adminPortal'),
+      hasDatabaseProviders: options.dataProviders.some((provider) => provider === 'postgresql' || provider === 'mysql' || provider === 'sqlite'),
+      hasPrisma: options.dataProviders.includes('prisma'),
+      hasObjectStorage: options.dataProviders.includes('s3'),
     };
   }
 }

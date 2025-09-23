@@ -1,0 +1,242 @@
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import type { DataProviderDescriptor } from '../../domain/status/system-info';
+
+const DIAGNOSTIC_TIMEOUT = 2500;
+
+type Evaluator = (descriptor: DataProviderDescriptor) => Promise<DataProviderDescriptor>;
+
+function formatMissingEnvMessage(keys: string[]): string {
+  return keys.length === 1
+    ? `Variable d'environnement manquante : ${keys[0]}.`
+    : `Variables d'environnement manquantes : ${keys.join(', ')}.`;
+}
+
+function sanitizeString(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+const evaluators: Record<string, Evaluator> = {
+<% if (dataProviders.includes('postgresql')) { %>
+  async postgresql(descriptor) {
+    const connectionString = sanitizeString(process.env.DATABASE_URL);
+
+    if (!connectionString) {
+      return {
+        ...descriptor,
+        status: 'warning',
+        details: "Définissez DATABASE_URL pour activer la connexion PostgreSQL.",
+      };
+    }
+
+    const { Client } = await import('pg');
+    const client = new Client({ connectionString, connectionTimeoutMillis: DIAGNOSTIC_TIMEOUT });
+
+    try {
+      await client.connect();
+      await client.query('SELECT 1');
+      return {
+        ...descriptor,
+        status: 'ok',
+        details: 'Connexion PostgreSQL opérationnelle.',
+      };
+    } catch (error) {
+      return {
+        ...descriptor,
+        status: 'critical',
+        details: `Connexion PostgreSQL impossible : ${(error as Error).message}`,
+      };
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  },
+<% } %>
+<% if (dataProviders.includes('mysql')) { %>
+  async mysql(descriptor) {
+    const dsn = sanitizeString(process.env.MYSQL_DSN);
+
+    if (!dsn) {
+      return {
+        ...descriptor,
+        status: 'warning',
+        details: 'Définissez MYSQL_DSN pour activer la connexion MySQL.',
+      };
+    }
+
+    try {
+      const mysql = await import('mysql2/promise');
+      const url = new URL(dsn);
+      const connection = await mysql.createConnection({
+        host: url.hostname,
+        port: Number(url.port || '3306'),
+        user: decodeURIComponent(url.username || ''),
+        password: url.password ? decodeURIComponent(url.password) : undefined,
+        database: url.pathname.replace(/^\//, '') || undefined,
+        connectTimeout: DIAGNOSTIC_TIMEOUT,
+      });
+
+      try {
+        await connection.ping();
+        return {
+          ...descriptor,
+          status: 'ok',
+          details: 'Connexion MySQL opérationnelle.',
+        };
+      } finally {
+        await connection.end().catch(() => undefined);
+      }
+    } catch (error) {
+      return {
+        ...descriptor,
+        status: 'critical',
+        details: `Connexion MySQL impossible : ${(error as Error).message}`,
+      };
+    }
+  },
+<% } %>
+<% if (dataProviders.includes('sqlite')) { %>
+  async sqlite(descriptor) {
+    const databasePath = sanitizeString(process.env.SQLITE_DATABASE_PATH);
+
+    if (!databasePath) {
+      return {
+        ...descriptor,
+        status: 'warning',
+        details: 'Définissez SQLITE_DATABASE_PATH pour activer SQLite.',
+      };
+    }
+
+    const resolvedPath = path.resolve(process.cwd(), databasePath);
+    const directory = path.dirname(resolvedPath);
+
+    await fs.mkdir(directory, { recursive: true });
+
+    try {
+      const sqliteModule = await import('better-sqlite3');
+      const Database = sqliteModule.default;
+      const db = new Database(resolvedPath, { timeout: DIAGNOSTIC_TIMEOUT });
+      db.pragma('journal_mode = WAL');
+      db.close();
+
+      return {
+        ...descriptor,
+        status: 'ok',
+        details: `Base SQLite prête (${resolvedPath}).`,
+      };
+    } catch (error) {
+      return {
+        ...descriptor,
+        status: 'critical',
+        details: `SQLite indisponible : ${(error as Error).message}`,
+      };
+    }
+  },
+<% } %>
+<% if (dataProviders.includes('prisma')) { %>
+  async prisma(descriptor) {
+    const schemaPath = path.resolve(process.cwd(), 'prisma/schema.prisma');
+
+    try {
+      await fs.access(schemaPath);
+      return {
+        ...descriptor,
+        status: 'ok',
+        details: 'Schéma Prisma détecté. Exécutez `prisma generate` pour générer le client.',
+      };
+    } catch {
+      return {
+        ...descriptor,
+        status: 'warning',
+        details: 'Initialisez Prisma avec `npx prisma init` pour créer prisma/schema.prisma.',
+      };
+    }
+  },
+<% } %>
+<% if (dataProviders.includes('s3')) { %>
+  async s3(descriptor) {
+    const region = sanitizeString(process.env.AWS_REGION);
+    const accessKeyId = sanitizeString(process.env.AWS_ACCESS_KEY_ID);
+    const secretAccessKey = sanitizeString(process.env.AWS_SECRET_ACCESS_KEY);
+    const bucket = sanitizeString(process.env.S3_BUCKET_NAME);
+
+    const missingEnv = [
+      ['AWS_REGION', region],
+      ['AWS_ACCESS_KEY_ID', accessKeyId],
+      ['AWS_SECRET_ACCESS_KEY', secretAccessKey],
+      ['S3_BUCKET_NAME', bucket],
+    ]
+      .filter(([, value]) => !value)
+      .map(([key]) => key);
+
+    if (missingEnv.length > 0) {
+      return {
+        ...descriptor,
+        status: 'warning',
+        details: `${formatMissingEnvMessage(missingEnv)}`,
+      };
+    }
+
+    try {
+      const { S3Client } = await import('@aws-sdk/client-s3');
+      const client = new S3Client({
+        region: region!,
+        credentials: {
+          accessKeyId: accessKeyId!,
+          secretAccessKey: secretAccessKey!,
+        },
+        endpoint: sanitizeString(process.env.S3_ENDPOINT),
+      });
+
+      const credentials = client.config.credentials;
+      if (typeof credentials === 'function') {
+        await credentials();
+      }
+
+      client.destroy();
+
+      return {
+        ...descriptor,
+        status: 'ok',
+        details: `Configuration S3 détectée pour le bucket ${bucket}.`,
+      };
+    } catch (error) {
+      return {
+        ...descriptor,
+        status: 'warning',
+        details: `Client S3 non initialisé : ${(error as Error).message}`,
+      };
+    }
+  },
+<% } %>
+};
+
+export async function evaluateDataProviders(
+  descriptors: DataProviderDescriptor[]
+): Promise<DataProviderDescriptor[]> {
+  if (descriptors.length === 0) {
+    return [];
+  }
+
+  return Promise.all(
+    descriptors.map(async (descriptor) => {
+      const evaluator = evaluators[descriptor.key];
+      if (!evaluator) {
+        return descriptor;
+      }
+
+      try {
+        return await evaluator({ ...descriptor });
+      } catch (error) {
+        return {
+          ...descriptor,
+          status: 'warning',
+          details: `Diagnostic impossible : ${(error as Error).message}`,
+        };
+      }
+    })
+  );
+}

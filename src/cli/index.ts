@@ -4,7 +4,7 @@ import fs from 'fs-extra';
 import path from 'node:path';
 import chalk from 'chalk';
 import { runCreateCommand } from './commands/create';
-import { FeatureKey, Language, featureCatalog } from './generators/types';
+import { DataProviderKey, FeatureKey, Language, dataProviderCatalog, featureCatalog } from './generators/types';
 
 function getPackageVersion(): string {
   try {
@@ -16,7 +16,7 @@ function getPackageVersion(): string {
   }
 }
 
-function parseFeaturesOption(input?: string): FeatureKey[] | undefined {
+function parseListOption(input?: string): string[] | undefined {
   if (!input) {
     return undefined;
   }
@@ -26,7 +26,17 @@ function parseFeaturesOption(input?: string): FeatureKey[] | undefined {
     .map((value) => value.trim())
     .filter((value) => value.length > 0);
 
-  return normalized as FeatureKey[];
+  return normalized;
+}
+
+function parseFeaturesOption(input?: string): FeatureKey[] | undefined {
+  const values = parseListOption(input);
+  return values ? (values as FeatureKey[]) : undefined;
+}
+
+function parseDataProvidersOption(input?: string): DataProviderKey[] | undefined {
+  const values = parseListOption(input);
+  return values ? (values as DataProviderKey[]) : undefined;
 }
 
 function isLanguage(value: string): value is Language {
@@ -47,12 +57,18 @@ async function main() {
     .option('-n, --name <name>', 'Nom du projet. (par défaut : nom du dossier)')
     .option('-l, --language <language>', 'Langage cible (typescript|javascript)')
     .option('-f, --features <features>', 'Modules à activer (séparés par des virgules).')
+    .option(
+      '-d, --data-providers <providers>',
+      'Options de persistance à préparer (séparées par des virgules).'
+    )
     .option('-p, --package-manager <manager>', 'Gestionnaire de packages (npm|pnpm|yarn).')
     .option('--dry-run', 'Affiche les actions sans écrire les fichiers.')
     .action(async (directory: string | undefined, commandOptions: Record<string, unknown>) => {
       const languageOption = typeof commandOptions.language === 'string' ? commandOptions.language : undefined;
       const featuresOption = typeof commandOptions.features === 'string' ? commandOptions.features : undefined;
       const packageManagerOption = typeof commandOptions.packageManager === 'string' ? commandOptions.packageManager : undefined;
+      const dataProvidersOption =
+        typeof commandOptions.dataProviders === 'string' ? (commandOptions.dataProviders as string) : undefined;
       const dryRun = Boolean(commandOptions.dryRun);
 
       if (languageOption && !isLanguage(languageOption)) {
@@ -74,11 +90,25 @@ async function main() {
         }
       }
 
+      const selectedDataProviders = parseDataProvidersOption(dataProvidersOption);
+      if (selectedDataProviders) {
+        const availableProviderKeys = new Set(dataProviderCatalog.map((provider) => provider.key));
+        const unknownProviders = selectedDataProviders.filter((provider) => !availableProviderKeys.has(provider));
+        if (unknownProviders.length > 0) {
+          throw new Error(
+            `Options de persistance inconnues : ${unknownProviders.join(', ')}. Options disponibles : ${dataProviderCatalog
+              .map((provider) => provider.key)
+              .join(', ')}`
+          );
+        }
+      }
+
       await runCreateCommand(directory, {
         projectName: typeof commandOptions.name === 'string' ? commandOptions.name : undefined,
         language: languageOption as Language | undefined,
         features: selectedFeatures,
         packageManager: packageManagerOption as 'npm' | 'pnpm' | 'yarn' | undefined,
+        dataProviders: selectedDataProviders,
         dryRun,
       });
     });

@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { buildTestApp } from '../utils/test-app';
+import { templateInfo } from '../../src/infrastructure/config/template-info';
 
 describe('API status', () => {
   it('returns a comprehensive API snapshot', async () => {
@@ -9,7 +10,7 @@ describe('API status', () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
-      status: 'ok',
+      status: expect.stringMatching(/^(ok|degraded)$/),
       info: {
         name: expect.any(String),
         version: expect.any(String),
@@ -22,7 +23,40 @@ describe('API status', () => {
       },
     });
 
-    expect(Array.isArray(response.body.features)).toBe(true);
-    expect(Array.isArray(response.body.dependencies)).toBe(true);
+    const features: Array<{ key: string }> = response.body.features ?? [];
+    const dependencies: Array<{ name: string; status?: string }> = response.body.dependencies ?? [];
+    const dataProviders: Array<{ key: string; status?: string; details?: string }> = response.body.dataProviders ?? [];
+
+    const featureKeys = new Set(features.map((feature) => feature.key));
+    for (const feature of templateInfo.features) {
+      expect(featureKeys.has(feature.key)).toBe(true);
+    }
+
+    const dependencyMap = new Map(dependencies.map((dependency) => [dependency.name, dependency]));
+    expect(dependencyMap.has('http')).toBe(true);
+    expect(dependencyMap.has('documentation')).toBe(true);
+
+    const databaseDependency = dependencyMap.get('database');
+
+    if (templateInfo.dataProviders.length === 0) {
+      expect(dataProviders).toEqual([]);
+      if (databaseDependency) {
+        expect(databaseDependency.status).toBe('skipped');
+      }
+    } else {
+      const providerMap = new Map(dataProviders.map((provider) => [provider.key, provider]));
+
+      for (const provider of templateInfo.dataProviders) {
+        const snapshot = providerMap.get(provider.key);
+        expect(snapshot).toBeDefined();
+        expect(snapshot).toMatchObject({
+          status: expect.stringMatching(/^(ok|warning|critical|skipped)$/),
+          details: expect.any(String),
+        });
+      }
+
+      expect(databaseDependency).toBeDefined();
+      expect(databaseDependency?.status).toMatch(/^(ok|warning|critical)$/);
+    }
   });
 });

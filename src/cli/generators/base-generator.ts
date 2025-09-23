@@ -1,7 +1,15 @@
 import path from 'node:path';
 import fs from 'fs-extra';
 import ejs from 'ejs';
-import { FeatureDefinition, FeatureKey, Language, featureCatalogMap } from './types';
+import {
+  DataProviderDefinition,
+  DataProviderKey,
+  FeatureDefinition,
+  FeatureKey,
+  Language,
+  dataProviderCatalogMap,
+  featureCatalogMap,
+} from './types';
 
 export interface DependencyItem {
   name: string;
@@ -20,6 +28,7 @@ export interface GenerateProjectOptions {
   language: Language;
   features: FeatureKey[];
   packageManager: 'npm' | 'pnpm' | 'yarn';
+  dataProviders: DataProviderKey[];
   dryRun?: boolean;
 }
 
@@ -36,6 +45,9 @@ export interface TemplateContext {
   features: FeatureKey[];
   selectedFeatures: FeatureDefinition[];
   featureSummaries: string[];
+  dataProviders: DataProviderKey[];
+  selectedDataProviders: DataProviderDefinition[];
+  dataProviderSummaries: string[];
   dependencies: DependencyItem[];
   devDependencies: DependencyItem[];
   scripts: Record<string, string>;
@@ -50,7 +62,7 @@ export abstract class BaseTemplateGenerator {
   constructor(private readonly templateRoot: string) {}
 
   async generate(options: GenerateProjectOptions) {
-    const { targetDirectory, features, projectName, language, packageManager } = options;
+    const { targetDirectory, features, dataProviders, projectName, language, packageManager } = options;
 
     if (!options.dryRun) {
       await fs.ensureDir(targetDirectory);
@@ -64,7 +76,15 @@ export abstract class BaseTemplateGenerator {
       return feature;
     });
 
-    const dependencies = this.buildDependencies(language, features);
+    const selectedDataProviders = dataProviders.map((providerKey) => {
+      const provider = dataProviderCatalogMap.get(providerKey);
+      if (!provider) {
+        throw new Error(`Option de persistance inconnue: ${providerKey}`);
+      }
+      return provider;
+    });
+
+    const dependencies = this.buildDependencies(language, features, dataProviders);
 
     const packageName = toPackageName(projectName);
     const packageManagerCommands = getPackageManagerCommands(packageManager);
@@ -76,6 +96,9 @@ export abstract class BaseTemplateGenerator {
       features,
       selectedFeatures,
       featureSummaries: selectedFeatures.map((feature) => feature.summary),
+      dataProviders,
+      selectedDataProviders,
+      dataProviderSummaries: selectedDataProviders.map((provider) => provider.summary),
       dependencies: dependencies.dependencies,
       devDependencies: dependencies.devDependencies,
       scripts: dependencies.scripts,
@@ -102,7 +125,11 @@ export abstract class BaseTemplateGenerator {
 
   protected abstract getBaseTemplateDir(): string;
   protected abstract getFeatureTemplateDir(feature: FeatureKey): string | undefined;
-  protected abstract buildDependencies(language: Language, features: FeatureKey[]): TemplateDependencies;
+  protected abstract buildDependencies(
+    language: Language,
+    features: FeatureKey[],
+    dataProviders: DataProviderKey[]
+  ): TemplateDependencies;
 
   protected getAdditionalContext(
     _options: GenerateProjectOptions,

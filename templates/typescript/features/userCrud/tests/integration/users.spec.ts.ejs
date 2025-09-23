@@ -12,20 +12,38 @@ describe('User administration', () => {
     return { app, token: response.body.tokens.accessToken };
   }
 
+  async function createUser(
+    app: Awaited<ReturnType<typeof buildTestApp>>,
+    token: string,
+    overrides: Partial<{ name: string; email: string; password: string; role: string }> = {}
+  ) {
+    const payload = {
+      name: 'New Client',
+      email: 'new-client@example.com',
+      password: 'Client#1234',
+      role: 'client',
+      ...overrides,
+    };
+
+    const response = await request(app)
+      .post('/users')
+      .set('Authorization', `Bearer ${token}`)
+      .send(payload);
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({
+      id: expect.any(String),
+      email: payload.email,
+      role: payload.role,
+    });
+
+    return response.body;
+  }
+
   it('allows an admin to list and create users', async () => {
     const { app, token } = await authenticateAdmin();
 
-    const createResponse = await request(app)
-      .post('/users')
-      .set('Authorization', `Bearer ${token}`)
-      .send({
-        name: 'New Client',
-        email: 'new-client@example.com',
-        password: 'Client#1234',
-        role: 'client',
-      });
-
-    expect(createResponse.status).toBe(201);
+    const created = await createUser(app, token);
 
     const listResponse = await request(app)
       .get('/users')
@@ -33,5 +51,45 @@ describe('User administration', () => {
 
     expect(listResponse.status).toBe(200);
     expect(Array.isArray(listResponse.body.users)).toBe(true);
+    expect(listResponse.body.users.some((user: { id: string }) => user.id === created.id)).toBe(true);
+  });
+
+  it('allows an admin to view, update and delete a user', async () => {
+    const { app, token } = await authenticateAdmin();
+
+    const created = await createUser(app, token, {
+      name: 'Client Demo',
+      email: 'client-demo@example.com',
+    });
+
+    const showResponse = await request(app)
+      .get(`/users/${created.id}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(showResponse.status).toBe(200);
+    expect(showResponse.body).toMatchObject({ id: created.id, email: 'client-demo@example.com' });
+
+    const updateResponse = await request(app)
+      .patch(`/users/${created.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Updated Client',
+        role: 'client',
+      });
+
+    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.body).toMatchObject({ id: created.id, name: 'Updated Client' });
+
+    const deleteResponse = await request(app)
+      .delete(`/users/${created.id}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(deleteResponse.status).toBe(204);
+
+    const afterDeleteResponse = await request(app)
+      .get(`/users/${created.id}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(afterDeleteResponse.status).toBe(404);
   });
 });

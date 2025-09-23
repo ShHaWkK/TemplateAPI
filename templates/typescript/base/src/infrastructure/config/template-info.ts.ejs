@@ -1,4 +1,4 @@
-import { DependencyStatus, FeatureDescriptor } from '../../domain/status/system-info';
+import { DataProviderDescriptor, DependencyStatus, FeatureDescriptor } from '../../domain/status/system-info';
 
 const features: FeatureDescriptor[] = <%- JSON.stringify(
   selectedFeatures.map((feature) => ({
@@ -6,6 +6,19 @@ const features: FeatureDescriptor[] = <%- JSON.stringify(
     name: feature.name,
     description: feature.description,
     summary: feature.summary,
+  })),
+  null,
+  2
+) %>;
+
+const dataProviders: DataProviderDescriptor[] = <%- JSON.stringify(
+  selectedDataProviders.map((provider) => ({
+    key: provider.key,
+    name: provider.name,
+    summary: provider.summary,
+    kind: provider.kind,
+    status: provider.defaultStatus,
+    details: provider.statusDescription,
   })),
   null,
   2
@@ -24,8 +37,12 @@ const dependencies: DependencyStatus[] = [
   },
   {
     name: 'database',
-    status: 'skipped',
-    details: "Aucune base de données n'est configurée par défaut. Ajoutez vos adapters lorsque vous en aurez besoin.",
+    status: <%- selectedDataProviders.length > 0 ? `'warning'` : `'skipped'` %>,
+    details: <%- JSON.stringify(
+      selectedDataProviders.length > 0
+        ? 'Clients installés. Configurez vos adapters pour activer la connexion.'
+        : "Aucune base de données n'est configurée par défaut. Ajoutez vos adapters lorsque vous en aurez besoin."
+    ) %>,
   },
 ];
 
@@ -58,11 +75,21 @@ dependencies.push({
 });
 <% } %>
 
+<% selectedDataProviders.forEach((provider) => { %>
+dependencies.push(<%- JSON.stringify({
+  name: provider.name,
+  status: provider.defaultStatus,
+  details: provider.statusDescription,
+}) %>);
+<% }); %>
+
 export const templateInfo = {
   projectName: '<%- projectName %>',
   features,
+  dataProviders,
   dependencies,
 } as const;
 
 export type GeneratedFeatureDescriptor = (typeof templateInfo.features)[number];
 export type GeneratedDependencyStatus = (typeof templateInfo.dependencies)[number];
+export type GeneratedDataProviderDescriptor = (typeof templateInfo.dataProviders)[number];

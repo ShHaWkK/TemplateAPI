@@ -1,0 +1,215 @@
+#!/usr/bin/env ts-node
+import process from 'node:process';
+import request from 'supertest';
+import { createApp } from '../src/interface/http/app';
+import { templateInfo } from '../src/infrastructure/config/template-info';
+
+interface ApiSnapshot {
+  status?: string;
+  features: Array<{ key?: string; name?: string; summary?: string }>;
+  dependencies: Array<{ name?: string; status?: string; details?: string }>;
+  dataProviders: Array<{ key?: string; name?: string; status?: string; details?: string }>;
+}
+
+type CheckResult = {
+  errors: string[];
+  warnings: string[];
+  snapshot: ApiSnapshot;
+};
+
+async function ensureContainerIsReady() {
+  const hasAuthFeature = templateInfo.features.some((feature) => feature.key === 'auth');
+  if (!hasAuthFeature) {
+    return;
+  }
+
+  try {
+    const containerModule: Record<string, unknown> = await import('../src/infrastructure/container');
+    const maybeReady = containerModule.containerReady;
+    if (maybeReady && typeof maybeReady === 'object' && 'then' in maybeReady) {
+      await maybeReady;
+    }
+  } catch (error) {
+    console.warn(
+      `⚠️  Impossible d'attendre le container d'injection : ${(error as Error).message}.` +
+        " Les vérifications se poursuivent tout de même."
+    );
+  }
+}
+
+async function runStatusAudit(): Promise<CheckResult> {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  await ensureContainerIsReady();
+
+  const app = createApp();
+
+  const healthResponse = await request(app).get('/health');
+  if (healthResponse.status !== 200) {
+    errors.push(`GET /health a renvoyé le statut HTTP ${healthResponse.status}.`);
+  }
+
+  const statusResponse = await request(app).get('/status');
+  if (statusResponse.status !== 200) {
+    errors.push(`GET /status a renvoyé le statut HTTP ${statusResponse.status}.`);
+    return {
+      errors,
+      warnings,
+      snapshot: { status: undefined, features: [], dependencies: [], dataProviders: [] },
+    };
+  }
+
+  const payload = statusResponse.body ?? {};
+  const snapshot: ApiSnapshot = {
+    status: payload.status,
+    features: Array.isArray(payload.features) ? payload.features : [],
+    dependencies: Array.isArray(payload.dependencies) ? payload.dependencies : [],
+    dataProviders: Array.isArray(payload.dataProviders) ? payload.dataProviders : [],
+  };
+
+  if (snapshot.status && snapshot.status !== 'ok') {
+    warnings.push(`Statut global renvoyé: "${snapshot.status}".`);
+  }
+
+  const featureKeys = new Set<string>((snapshot.features ?? []).map((feature) => feature?.key ?? ''));
+  for (const feature of templateInfo.features) {
+    if (!featureKeys.has(feature.key)) {
+      errors.push(`La fonctionnalité "${feature.name}" (${feature.key}) est absente de /status.`);
+    }
+  }
+
+  const dependencyStatuses = new Map<string, { name?: string; status?: string; details?: string }>(
+    snapshot.dependencies.map((dependency) => [dependency?.name ?? 'unknown', dependency ?? {}])
+  );
+
+  for (const dependency of dependencyStatuses.values()) {
+    if (dependency.status === 'critical') {
+      errors.push(
+        `La dépendance "${dependency.name}" est en statut critique (${dependency.details ?? 'aucun détail fourni'}).`
+      );
+    } else if (dependency.status === 'warning') {
+      warnings.push(
+        `La dépendance "${dependency.name}" nécessite une attention particulière (${dependency.details ?? 'aucun détail fourni'}).`
+      );
+    }
+  }
+
+  const providerStatuses = new Map<string, { key?: string; status?: string; details?: string }>(
+    snapshot.dataProviders.map((provider) => [provider?.key ?? 'unknown', provider ?? {}])
+  );
+
+  for (const provider of templateInfo.dataProviders) {
+    const status = providerStatuses.get(provider.key);
+    if (!status) {
+      warnings.push(`L'option de persistance "${provider.name}" n'apparaît pas encore dans /status.`);
+      continue;
+    }
+    if (status.status === 'critical') {
+      errors.push(`"${provider.name}" est en échec critique (${status.details ?? 'aucun détail fourni'}).`);
+    } else if (status.status === 'warning') {
+      warnings.push(
+        `"${provider.name}" nécessite une configuration supplémentaire (${status.details ?? provider.details}).`
+      );
+    }
+  }
+
+  return { errors, warnings, snapshot };
+}
+
+function formatItemLine(label: string, status?: string, details?: string) {
+  const statusLabel = status ? status.toUpperCase() : 'INCONNU';
+  const segments = [`${label} [${statusLabel}]`];
+  if (details) {
+    segments.push(details);
+  }
+  return segments.join(' — ');
+}
+
+function printSummary(snapshot: ApiSnapshot) {
+  console.log('');
+  console.log(`Résumé API : ${snapshot.status ? snapshot.status.toUpperCase() : 'INCONNU'}`);
+
+  if (snapshot.features.length > 0) {
+    console.log(`Fonctionnalités (${snapshot.features.length}) :`);
+    for (const feature of snapshot.features) {
+      const label = feature.name ?? feature.key ?? 'Inconnue';
+      const summary = feature.summary ? ` — ${feature.summary}` : '';
+      console.log(`  - ${label}${summary}`);
+    }
+  } else {
+    console.log("Fonctionnalités : aucune fonctionnalité détectée dans /status.");
+  }
+
+  if (snapshot.dataProviders.length > 0) {
+    console.log('Persistance :');
+    for (const provider of snapshot.dataProviders) {
+      const label = provider.name ?? provider.key ?? 'Inconnue';
+      console.log(`  - ${formatItemLine(label, provider.status, provider.details)}`);
+    }
+  } else {
+    console.log('Persistance : aucune option sélectionnée.');
+  }
+
+  if (snapshot.dependencies.length > 0) {
+    console.log('Dépendances :');
+    for (const dependency of snapshot.dependencies) {
+      const label = dependency.name ?? 'Inconnue';
+      console.log(`  - ${formatItemLine(label, dependency.status, dependency.details)}`);
+    }
+  }
+
+  console.log('');
+}
+
+function printHelp() {
+  const command = process.argv[1]?.includes('node_modules') ? 'npm run api -- --status' : 'api --status';
+  console.log('Usage :');
+  console.log(`  ${command}`);
+  console.log('');
+  console.log('Options :');
+  console.log('  --status       Lance un audit rapide de /health et /status (par défaut).');
+  console.log('  -h, --help     Affiche cette aide.');
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+
+  if (args.includes('--help') || args.includes('-h')) {
+    printHelp();
+    return;
+  }
+
+  const wantsStatus = args.length === 0 || args.includes('--status') || args.includes('status');
+  if (!wantsStatus) {
+    console.error(`Commande inconnue: ${args.join(' ') || '(aucune)'}.`);
+    printHelp();
+    process.exit(1);
+  }
+
+  console.log('🔍 Vérification du statut API...');
+
+  try {
+    const { errors, warnings, snapshot } = await runStatusAudit();
+
+    for (const warning of warnings) {
+      console.warn(`⚠️  ${warning}`);
+    }
+
+    printSummary(snapshot);
+
+    if (errors.length > 0) {
+      for (const error of errors) {
+        console.error(`❌ ${error}`);
+      }
+      process.exit(1);
+    }
+
+    console.log('✅ API opérationnelle : /health et /status répondent correctement.');
+  } catch (error) {
+    console.error(`❌ Audit impossible : ${(error as Error).message}`);
+    process.exit(1);
+  }
+}
+
+void main();

@@ -12,6 +12,17 @@ Généré avec **create-template-api** le <%- createdAt %>.
 <% }); %>
 <% } %>
 
+<% if (dataProviderSummaries.length) { %>
+## 🗄️ Persistance & stockage préparés
+
+<% dataProviderSummaries.forEach((summary) => { %>- <%- summary %>
+<% }); %>
+<% } else { %>
+## 🗄️ Persistance & stockage
+
+- Aucun connecteur de persistance sélectionné. Branchez vos adapters dans `src/infrastructure`.
+<% } %>
+
 ## 🗂 Architecture hexagonale
 
 ```
@@ -28,6 +39,17 @@ src/
 <%- packageManagerCommands.install %>
 <%- packageManagerCommands.run %> dev
 ```
+
+<% const apiStatusCommand = packageManager === 'npm' ? 'npm run api -- --status' : packageManager === 'pnpm' ? 'pnpm api --status' : 'yarn api --status'; %>
+
+### Diagnostic assisté
+
+```bash
+<%- apiStatusCommand %>
+```
+
+Vérifie automatiquement `/health` et `/status` en mettant en évidence les modules et options de persistance sélectionnés et
+affiche un résumé clair des diagnostics collectés.
 
 ### Scripts utiles
 
@@ -46,6 +68,9 @@ src/
 ```bash
 <%- packageManagerCommands.run %> test
 ```
+
+Des scénarios d'intégration couvrent l'authentification, la gestion des utilisateurs (CRUD complet) et les portails optionnels
+pour garantir le bon fonctionnement du template dès la génération.
 
 ## 🛡 Bonnes pratiques
 

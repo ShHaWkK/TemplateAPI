@@ -25,11 +25,43 @@ function ensureSafeProjectDirectory(targetDir: string) {
   }
 }
 
-export async function runCreateCommand(directoryArg: string | undefined, options: CreateCommandOptions) {
-  const answers = await promptForMissingOptions(options);
+function getPackageManagerCommand(
+  packageManager: 'npm' | 'pnpm' | 'yarn',
+  command: 'install' | 'dev' | 'apiStatus'
+) {
+  if (packageManager === 'npm') {
+    if (command === 'install') {
+      return 'npm install';
+    }
+    if (command === 'dev') {
+      return 'npm run dev';
+    }
+    return 'npm run api -- --status';
+  }
 
-  const targetDirectoryName = directoryArg ?? answers.projectName;
-  const targetDirectory = path.resolve(process.cwd(), targetDirectoryName);
+  if (packageManager === 'pnpm') {
+    if (command === 'install') {
+      return 'pnpm install';
+    }
+    if (command === 'dev') {
+      return 'pnpm dev';
+    }
+    return 'pnpm api --status';
+  }
+
+  if (command === 'install') {
+    return 'yarn install';
+  }
+  if (command === 'dev') {
+    return 'yarn dev';
+  }
+  return 'yarn api --status';
+}
+
+export async function runCreateCommand(directoryArg: string | undefined, options: CreateCommandOptions) {
+  const answers = await promptForMissingOptions({ ...options, targetDirectory: directoryArg ?? options.targetDirectory });
+
+  const targetDirectory = path.resolve(process.cwd(), answers.targetDirectory);
 
   ensureSafeProjectDirectory(targetDirectory);
 
@@ -41,6 +73,7 @@ export async function runCreateCommand(directoryArg: string | undefined, options
     language: answers.language,
     features: answers.features,
     packageManager: answers.packageManager,
+    dataProviders: answers.dataProviders,
     dryRun: options.dryRun ?? false,
   });
 
@@ -48,8 +81,9 @@ export async function runCreateCommand(directoryArg: string | undefined, options
 
   const instructions = `\n${chalk.bold('Prochaines étapes :')}\n` +
     `  ${chalk.cyan(`cd ${relativePath}`)}\n` +
-    `  ${chalk.cyan(`${answers.packageManager} install`)}\n` +
-    `  ${chalk.cyan(`${answers.packageManager} run dev`)}\n`;
+    `  ${chalk.cyan(getPackageManagerCommand(answers.packageManager, 'install'))}\n` +
+    `  ${chalk.cyan(getPackageManagerCommand(answers.packageManager, 'dev'))}\n` +
+    `  ${chalk.cyan(getPackageManagerCommand(answers.packageManager, 'apiStatus'))} (optionnel)`;
 
   console.log('\n' + chalk.green('✅ Template API généré avec succès !'));
   console.log(instructions);

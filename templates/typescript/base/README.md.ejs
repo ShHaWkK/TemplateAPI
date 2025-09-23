@@ -13,6 +13,17 @@ Généré avec **create-template-api** le <%- createdAt %>.
 <% }); %>
 <% } %>
 
+<% if (dataProviderSummaries.length) { %>
+## 🗄️ Persistance & stockage préparés
+
+<% dataProviderSummaries.forEach((summary) => { %>- <%- summary %>
+<% }); %>
+<% } else { %>
+## 🗄️ Persistance & stockage
+
+- Aucune intégration de base de données ou de stockage n'a été sélectionnée. Branchez vos adapters dans `src/infrastructure`.
+<% } %>
+
 ## 🗂 Architecture hexagonale
 
 ```
@@ -40,6 +51,18 @@ curl http://localhost:3333/status
 
 Vous obtenez un instantané JSON avec l'état global, les fonctionnalités activées, les dépendances simulées
 et les liens utiles. Pour un simple ping, `GET /health` reste disponible.
+
+<% const apiStatusCommand = packageManager === 'npm' ? 'npm run api -- --status' : packageManager === 'pnpm' ? 'pnpm api --status' : 'yarn api --status'; %>
+
+### Diagnostic assisté en CLI
+
+```bash
+<%- apiStatusCommand %>
+```
+
+Ce script lance automatiquement `GET /health` et `GET /status`, vérifie les fonctionnalités choisies ainsi que les options
+de persistance déclarées et vous alerte si une dépendance critique est en erreur. Un résumé lisible présente les modules
+actifs, l'état des stockages configurés et les diagnostics agrégés.
 <% if (features.includes('auth')) { %>
 
 ### Scénario d'authentification prêt à l'emploi
@@ -89,6 +112,8 @@ curl -H "Authorization: Bearer ${ACCESS_TOKEN}" http://localhost:3333/me
 ```
 
 Les tests reposent sur Jest et Supertest. Des doubles in-memory permettent d'isoler les cas d'usage des dépendances.
+Chaque fonctionnalité activée dispose de scénarios de bout en bout : flux d'authentification, gestion complète des
+utilisateurs (création, consultation, mise à jour, suppression) et espaces client / admin lorsqu'ils sont sélectionnés.
 
 ## 🛡 Sécurité & bonnes pratiques
 

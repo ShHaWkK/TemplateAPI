@@ -422,6 +422,21 @@ export const openApiDocument: OpenAPIV3.Document = {
             type: 'array',
             items: { $ref: '#/components/schemas/DependencyStatus' },
           },
+          dataProviders: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/DataProvider' },
+          },
+        },
+      },
+      DataProvider: {
+        type: 'object',
+        properties: {
+          key: { type: 'string' },
+          name: { type: 'string' },
+          summary: { type: 'string' },
+          kind: { type: 'string', enum: ['database', 'orm', 'storage'] },
+          status: { type: 'string', enum: ['ok', 'warning', 'critical', 'skipped'] },
+          details: { type: 'string' },
         },
       },
       HealthResponse: {
