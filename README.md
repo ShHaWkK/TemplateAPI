@@ -1,5 +1,12 @@
-# create-template-api
+  |__   __|                     | |       | |            /\    |  __ \|_   _|
+     | |  ___  _ __ ___   _ __  | |  __ _ | |_  ___     /  \   | |__) | | |  
+     | | / _ \| '_ ` _ \ | '_ \ | | / _` || __|/ _ \   / /\ \  |  ___/  | |  
+     | ||  __/| | | | | || |_) || || (_| || |_|  __/  / ____ \ | |     _| |_ 
+     |_| \___||_| |_| |_|| .__/ |_| \__,_| \__|\___| /_/    \_\|_|    |_____|
+                         | |                                                 
+                         |_|                                
 
+                         
 **create-template-api** est un générateur interactif de bases d'API Node.js prêtes pour la production.
 Il permet de sélectionner dynamiquement le langage (TypeScript ou JavaScript) ainsi que les modules
 fonctionnels (authentification JWT, gestion d'utilisateurs, espaces client / admin, etc.) sans
