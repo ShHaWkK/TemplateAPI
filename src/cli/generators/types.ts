@@ -6,12 +6,26 @@ export type FeatureKey =
   | 'clientPortal'
   | 'adminPortal';
 
+export type DataProviderKey = 'postgresql' | 'mysql' | 'sqlite' | 'prisma' | 's3';
+
 export interface FeatureDefinition {
   key: FeatureKey;
   name: string;
   description: string;
   summary: string;
   dependencies?: FeatureKey[];
+}
+
+export type DataProviderKind = 'database' | 'orm' | 'storage';
+
+export interface DataProviderDefinition {
+  key: DataProviderKey;
+  name: string;
+  description: string;
+  summary: string;
+  kind: DataProviderKind;
+  defaultStatus: 'ok' | 'warning' | 'critical' | 'skipped';
+  statusDescription: string;
 }
 
 export const featureCatalog: FeatureDefinition[] = [
@@ -51,6 +65,56 @@ export const featureCatalog: FeatureDefinition[] = [
 ];
 
 export const featureCatalogMap = new Map(featureCatalog.map((feature) => [feature.key, feature]));
+
+export const dataProviderCatalog: DataProviderDefinition[] = [
+  {
+    key: 'postgresql',
+    name: 'PostgreSQL',
+    description: 'Base de données relationnelle robuste et extensible, idéale pour les API critiques.',
+    summary: 'Prêt pour PostgreSQL : variables d\'environnement et dépendances du client `pg`.',
+    kind: 'database',
+    defaultStatus: 'warning',
+    statusDescription: 'Client PostgreSQL installé. Configurez DATABASE_URL pour activer la connexion.',
+  },
+  {
+    key: 'mysql',
+    name: 'MySQL',
+    description: 'Base relationnelle populaire avec un vaste écosystème d\'outils et d\'hébergements.',
+    summary: 'Support MySQL prêt avec le driver `mysql2`.',
+    kind: 'database',
+    defaultStatus: 'warning',
+    statusDescription: 'Client MySQL installé. Définissez MYSQL_DSN pour connecter votre instance.',
+  },
+  {
+    key: 'sqlite',
+    name: 'SQLite',
+    description: 'Base relationnelle légère stockée sur le disque, parfaite pour les tests ou prototypes.',
+    summary: 'Driver SQLite prêt à être câblé dans vos adapters.',
+    kind: 'database',
+    defaultStatus: 'warning',
+    statusDescription: 'Bibliothèque SQLite installée. Fournissez le chemin du fichier SQLITEDB pour l\'utiliser.',
+  },
+  {
+    key: 'prisma',
+    name: 'Prisma ORM',
+    description: 'ORM moderne permettant de modéliser votre schéma et générer un client typesafe.',
+    summary: 'Prisma initialisé (CLI + client) avec scripts de migration.',
+    kind: 'orm',
+    defaultStatus: 'warning',
+    statusDescription: 'Prisma installé. Initialisez votre schéma avec `npx prisma init`.',
+  },
+  {
+    key: 's3',
+    name: 'Stockage objet S3',
+    description: 'Intégration prête avec AWS S3 (compatible MinIO) pour gérer vos fichiers.',
+    summary: 'Client AWS S3 disponible. Configurez les identifiants pour activer l\'adapter.',
+    kind: 'storage',
+    defaultStatus: 'warning',
+    statusDescription: 'Client S3 en attente de configuration (AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY).',
+  },
+];
+
+export const dataProviderCatalogMap = new Map(dataProviderCatalog.map((provider) => [provider.key, provider]));
 
 export function resolveFeatureDependencies(selected: FeatureKey[]): FeatureKey[] {
   const resolved = new Set<FeatureKey>();

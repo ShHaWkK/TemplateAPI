@@ -27,6 +27,14 @@ export interface ApiStatusResponse {
     status: 'ok' | 'warning' | 'critical' | 'skipped';
     details?: string;
   }>;
+  dataProviders: Array<{
+    key: string;
+    name: string;
+    summary: string;
+    kind: 'database' | 'orm' | 'storage';
+    status: 'ok' | 'warning' | 'critical' | 'skipped';
+    details: string;
+  }>;
 }
 
 export class GetApiStatusUseCase {
@@ -58,6 +66,7 @@ export class GetApiStatusUseCase {
         description: feature.description,
       })),
       dependencies: snapshot.dependencies.map((dependency) => ({ ...dependency })),
+      dataProviders: snapshot.dataProviders.map((provider) => ({ ...provider })),
     };
   }
 }

@@ -42,5 +42,27 @@ describe('Authentication flows', () => {
       expect.objectContaining({ accessToken: expect.any(String), refreshToken: expect.any(String) })
     );
   });
+
+  it('revokes refresh tokens after logout', async () => {
+    const app = await buildTestApp();
+
+    const loginResponse = await request(app).post('/auth/login').send({
+      email: 'admin@example.com',
+      password: 'Admin#1234',
+    });
+
+    const { accessToken, refreshToken } = loginResponse.body.tokens;
+
+    const logoutResponse = await request(app).post('/auth/logout').set('Authorization', `Bearer ${accessToken}`).send({
+      refreshToken,
+    });
+
+    expect(logoutResponse.status).toBe(204);
+
+    const refreshResponse = await request(app).post('/auth/refresh').send({ refreshToken });
+
+    expect(refreshResponse.status).toBe(401);
+    expect(refreshResponse.body).toMatchObject({ error: 'AuthenticationError' });
+  });
 });
 <% } %>

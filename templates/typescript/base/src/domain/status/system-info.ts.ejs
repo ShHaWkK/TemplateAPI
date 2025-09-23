@@ -13,6 +13,15 @@ export interface FeatureDescriptor {
   summary: string;
 }
 
+export interface DataProviderDescriptor {
+  key: string;
+  name: string;
+  summary: string;
+  kind: 'database' | 'orm' | 'storage';
+  status: DependencyHealth;
+  details: string;
+}
+
 export interface SystemInfoSnapshot {
   name: string;
   version: string;
@@ -21,6 +30,7 @@ export interface SystemInfoSnapshot {
   documentationUrl: string;
   features: FeatureDescriptor[];
   dependencies: DependencyStatus[];
+  dataProviders: DataProviderDescriptor[];
 }
 
 export interface SystemInfoProvider {

@@ -2,9 +2,38 @@ import packageJson from '../../../package.json';
 import { SystemInfoProvider, SystemInfoSnapshot } from '../../domain/status/system-info';
 import { env } from '../config/env';
 import { templateInfo } from '../config/template-info';
+import { evaluateDataProviders } from './data-provider-health';
 
 export class ConfigSystemInfoProvider implements SystemInfoProvider {
   async getSnapshot(): Promise<SystemInfoSnapshot> {
+    const dataProviders = await evaluateDataProviders(templateInfo.dataProviders);
+
+    const dependencies = templateInfo.dependencies.map((dependency) => {
+      if (dependency.name === 'database') {
+        if (dataProviders.length === 0) {
+          return { ...dependency, status: 'skipped', details: dependency.details };
+        }
+
+        const hasCritical = dataProviders.some((provider) => provider.status === 'critical');
+        const hasWarning = dataProviders.some((provider) => provider.status === 'warning');
+
+        return {
+          ...dependency,
+          status: hasCritical ? 'critical' : hasWarning ? 'warning' : 'ok',
+          details: dataProviders
+            .map((provider) => `${provider.name}: ${provider.details}`)
+            .join(' '),
+        };
+      }
+
+      const provider = dataProviders.find((item) => item.name === dependency.name);
+      if (provider) {
+        return { ...dependency, status: provider.status, details: provider.details };
+      }
+
+      return { ...dependency };
+    });
+
     return {
       name: env.APP_NAME,
       version: packageJson.version ?? '0.0.0',
@@ -12,7 +41,8 @@ export class ConfigSystemInfoProvider implements SystemInfoProvider {
       port: env.API_PORT,
       documentationUrl: '/docs',
       features: templateInfo.features.map((feature) => ({ ...feature })),
-      dependencies: templateInfo.dependencies.map((dependency) => ({ ...dependency })),
+      dependencies,
+      dataProviders,
     };
   }
 }
