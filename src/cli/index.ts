@@ -6,6 +6,19 @@ import chalk from 'chalk';
 import { runCreateCommand } from './commands/create';
 import { DataProviderKey, FeatureKey, Language, dataProviderCatalog, featureCatalog } from './generators/types';
 
+const BANNER_ASCII = String.raw`
+  |__   __|                     | |       | |            /\    |  __ \|_   _|
+     | |  ___  _ __ ___   _ __  | |  __ _ | |_  ___     /  \   | |__) | | |  
+     | | / _ \| '_ \ _ \ | '_ \ | | / _\` || __|/ _ \   / /\ \  |  ___/  | |  
+     | ||  __/| | | | | || |_) || || (_| || |_|  __/  / ____ \ | |     _| |_ 
+     |_| \___||_| |_| |_|| .__/ |_| \__,_| \__|\___| /_/    \_\|_|    |_____|
+                         | |                                                 
+                         |_|                                
+`;
+function printBanner(): void {
+  console.log(chalk.cyan(BANNER_ASCII));
+}
+
 function getPackageVersion(): string {
   try {
     const packageJsonPath = path.resolve(__dirname, '../../package.json');
@@ -46,6 +59,7 @@ function isLanguage(value: string): value is Language {
 async function main() {
   const program = new Command();
   const version = getPackageVersion();
+  printBanner();
 
   program
     .name('create-template-api')
@@ -120,3 +134,4 @@ async function main() {
 }
 
 main();
+
