@@ -78,11 +78,11 @@ export class JavaScriptTemplateGenerator extends BaseTemplateGenerator {
     const scripts: Record<string, string> = {
       dev: 'nodemon src/server.js',
       start: 'node src/server.js',
-      build: 'echo \"No build step required\"',
+      build: 'echo No build step required',
       test: 'jest --passWithNoTests',
       'test:watch': 'jest --watch',
-      lint: 'eslint "src/**/*.js"',
-      format: 'prettier --write "src/**/*.js"',
+      lint: 'eslint src tests',
+      format: 'prettier --write src tests',
       api: 'node scripts/api-cli.js',
     };
 

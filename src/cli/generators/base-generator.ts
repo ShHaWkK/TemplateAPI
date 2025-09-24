@@ -1,6 +1,7 @@
 import path from 'node:path';
 import fs from 'fs-extra';
 import ejs from 'ejs';
+import { formatPackageName } from '../utils/project-name';
 import {
   DataProviderDefinition,
   DataProviderKey,
@@ -86,7 +87,7 @@ export abstract class BaseTemplateGenerator {
 
     const dependencies = this.buildDependencies(language, features, dataProviders);
 
-    const packageName = toPackageName(projectName);
+    const packageName = formatPackageName(projectName);
     const packageManagerCommands = getPackageManagerCommands(packageManager);
 
     const context: TemplateContext = {
@@ -186,13 +187,4 @@ function getPackageManagerCommands(packageManager: 'npm' | 'pnpm' | 'yarn'): Pac
     default:
       return { install: 'yarn install', run: 'yarn', exec: 'yarn dlx' };
   }
-}
-
-function toPackageName(projectName: string): string {
-  return projectName
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-    || 'template-api';
 }

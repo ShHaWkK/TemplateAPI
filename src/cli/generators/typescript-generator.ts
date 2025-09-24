@@ -95,8 +95,8 @@ export class TypeScriptTemplateGenerator extends BaseTemplateGenerator {
       start: 'node dist/server.js',
       test: 'jest --passWithNoTests',
       'test:watch': 'jest --watch',
-      lint: 'eslint "src/**/*.ts"',
-      format: 'prettier --write "src/**/*.ts"',
+      lint: 'eslint --ext .ts src tests',
+      format: 'prettier --write src tests',
       api: 'ts-node scripts/api-cli.ts',
     };
 

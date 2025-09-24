@@ -10,6 +10,7 @@ import {
   featureCatalogMap,
   resolveFeatureDependencies,
 } from '../generators/types';
+import { defaultTargetDirectory } from '../utils/project-name';
 
 export interface PromptAnswers {
   targetDirectory: string;
@@ -32,13 +33,34 @@ export interface PromptOptions {
 export async function promptForMissingOptions(options: PromptOptions): Promise<PromptAnswers> {
   const questions: inquirer.QuestionCollection[] = [];
 
+  if (!options.projectName) {
+    questions.push({
+      type: 'input',
+      name: 'projectName',
+      message: 'Nom du projet :',
+      default: () => {
+        const targetDirectory = (options.targetDirectory ?? '').toString().trim();
+        if (!targetDirectory) {
+          return 'mon-api';
+        }
+        const resolved = path.resolve(targetDirectory);
+        return path.basename(resolved);
+      },
+      filter: (input: string) => input.trim(),
+      validate: (input: string) => (input.trim().length > 0 ? true : 'Le nom du projet est obligatoire.'),
+    });
+  }
+
   if (!options.targetDirectory) {
     questions.push({
       type: 'input',
       name: 'targetDirectory',
       message: 'Dans quel dossier souhaitez-vous générer le template ? (il sera créé si besoin)',
-      default: './mon-api',
-      filter: (input: string) => input.trim() || './mon-api',
+      default: (answers: inquirer.Answers) => {
+        const projectNameAnswer = (options.projectName ?? answers.projectName ?? '').toString().trim();
+        return defaultTargetDirectory(projectNameAnswer || 'mon-api');
+      },
+      filter: (input: string) => input.trim(),
       validate: (input: string) => {
         const value = input.trim();
         if (!value) {
@@ -49,23 +71,6 @@ export async function promptForMissingOptions(options: PromptOptions): Promise<P
         }
         return true;
       },
-    });
-  }
-
-  if (!options.projectName) {
-    questions.push({
-      type: 'input',
-      name: 'projectName',
-      message: 'Nom du projet :',
-      default: (answers: inquirer.Answers) => {
-        const targetDirectory = (options.targetDirectory ?? answers.targetDirectory ?? '').toString();
-        if (!targetDirectory) {
-          return 'mon-api';
-        }
-        const resolved = path.resolve(targetDirectory.trim());
-        return path.basename(resolved);
-      },
-      validate: (input: string) => (input.trim().length > 0 ? true : 'Le nom du projet est obligatoire.'),
     });
   }
 
@@ -126,8 +131,12 @@ export async function promptForMissingOptions(options: PromptOptions): Promise<P
 
   const answers = await inquirer.prompt(questions);
 
-  const targetDirectory = options.targetDirectory ?? answers.targetDirectory ?? options.projectName ?? answers.projectName;
-  const projectName = options.projectName ?? answers.projectName;
+  const rawProjectName = (options.projectName ?? answers.projectName ?? '').toString().trim();
+  const projectName = rawProjectName || 'mon-api';
+
+  const rawTargetDirectoryInput = (options.targetDirectory ?? answers.targetDirectory ?? '').toString().trim();
+  const targetDirectory = rawTargetDirectoryInput || defaultTargetDirectory(projectName);
+
   const language = options.language ?? answers.language;
   const rawFeatures: FeatureKey[] = options.features ?? answers.features;
   const resolvedFeatures = resolveFeatureDependencies(rawFeatures);
