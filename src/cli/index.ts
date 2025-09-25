@@ -18,7 +18,7 @@ import {
 const BANNER_ASCII = String.raw`
   |__   __|                     | |       | |            /\    |  __ \|_   _|
      | |  ___  _ __ ___   _ __  | |  __ _ | |_  ___     /  \   | |__) | | |  
-     | | / _ \| '_ \ _ \ | '_ \ | | / _\` || __|/ _ \   / /\ \  |  ___/  | |  
+     | | / _ \| '_ \ _ \ | '_ \ | | / _\` || __|/ _ \  / /\ \  |  ___/  | |  
      | ||  __/| | | | | || |_) || || (_| || |_|  __/  / ____ \ | |     _| |_ 
      |_| \___||_| |_| |_|| .__/ |_| \__,_| \__|\___| /_/    \_\|_|    |_____|
                          | |                                                 
@@ -72,21 +72,21 @@ async function main() {
 
   program
     .name('create-template-api')
-    .description("Générateur d'API hexagonale modulaire sans base de données.")
+    .description("Gï¿½nï¿½rateur d'API hexagonale modulaire sans base de donnï¿½es.")
     .version(version);
 
   program
-    .argument('[directory]', 'Répertoire cible (sera créé s\'il n\'existe pas).')
-    .option('-n, --name <name>', 'Nom du projet. (par défaut : nom du dossier)')
+    .argument('[directory]', 'Rï¿½pertoire cible (sera crï¿½ï¿½ s\'il n\'existe pas).')
+    .option('-n, --name <name>', 'Nom du projet. (par dï¿½faut : nom du dossier)')
     .option('-l, --language <language>', 'Langage cible (typescript|javascript)')
-    .option('-f, --features <features>', 'Modules à activer (séparés par des virgules).')
+    .option('-f, --features <features>', 'Modules ï¿½ activer (sï¿½parï¿½s par des virgules).')
     .option(
       '-d, --data-providers <providers>',
-      'Options de persistance à préparer (séparées par des virgules).'
+      'Options de persistance ï¿½ prï¿½parer (sï¿½parï¿½es par des virgules).'
     )
     .option('-p, --package-manager <manager>', 'Gestionnaire de packages (npm|pnpm|yarn).')
-    .option('--frontend <framework>', 'Front-end à générer (none|react-vite|nextjs).')
-    .option('--dry-run', 'Affiche les actions sans écrire les fichiers.')
+    .option('--frontend <framework>', 'Front-end ï¿½ gï¿½nï¿½rer (none|react-vite|nextjs).')
+    .option('--dry-run', 'Affiche les actions sans ï¿½crire les fichiers.')
     .action(async (directory: string | undefined, commandOptions: Record<string, unknown>) => {
       const languageOption = typeof commandOptions.language === 'string' ? commandOptions.language : undefined;
       const featuresOption = typeof commandOptions.features === 'string' ? commandOptions.features : undefined;
