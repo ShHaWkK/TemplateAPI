@@ -28,7 +28,7 @@ const dependencies: DependencyStatus[] = [
   {
     name: 'http',
     status: 'ok',
-    details: 'Serveur Express initialisÃ©.',
+    details: 'Serveur Express initialisé.',
   },
   {
     name: 'documentation',
@@ -40,8 +40,10 @@ const dependencies: DependencyStatus[] = [
     status: <%- selectedDataProviders.length > 0 ? `'warning'` : `'skipped'` %>,
     details: <%- JSON.stringify(
       selectedDataProviders.length > 0
-        ? 'Clients installÃ©s. Configurez vos adapters pour activer la connexion.'
-        : "Aucune base de donnÃ©es n'est configurÃ©e par dÃ©faut. Ajoutez vos adapters lorsque vous en aurez besoin."
+        ? (hasPrisma
+            ? "Prisma/PostgreSQL prêt : exécutez `npm run prisma:generate`, `npm run prisma:migrate` puis `npm run db:seed`."
+            : 'Clients installés. Configurez vos adapters pour activer la connexion.')
+        : "Aucune base de données n'est configurée par défaut. Ajoutez vos adapters lorsque vous en aurez besoin."
     ) %>,
   },
 ];
@@ -57,21 +59,21 @@ dependencies.push({
 dependencies.push({
   name: 'userRepository',
   status: 'ok',
-  details: 'Gestion CRUD des utilisateurs en mÃ©moire activÃ©e.',
+  details: <%- JSON.stringify(hasPrisma ? 'Gestion CRUD des utilisateurs via Prisma/PostgreSQL.' : 'Gestion CRUD des utilisateurs en mémoire activée.') %>,
 });
 <% } %>
 <% if (features.includes('clientPortal')) { %>
 dependencies.push({
   name: 'clientPortal',
   status: 'ok',
-  details: 'Routes client protÃ©gÃ©es prÃªtes Ã  l'emploi.',
+  details: 'Routes client protégées prêtes à l\'emploi.',
 });
 <% } %>
 <% if (features.includes('adminPortal')) { %>
 dependencies.push({
   name: 'adminPortal',
   status: 'ok',
-  details: 'Endpoints administrateur sÃ©curisÃ©s disponibles.',
+  details: 'Endpoints administrateur sécurisés disponibles.',
 });
 <% } %>
 
@@ -93,3 +95,4 @@ export const templateInfo = {
 export type GeneratedFeatureDescriptor = (typeof templateInfo.features)[number];
 export type GeneratedDependencyStatus = (typeof templateInfo.dependencies)[number];
 export type GeneratedDataProviderDescriptor = (typeof templateInfo.dataProviders)[number];
+

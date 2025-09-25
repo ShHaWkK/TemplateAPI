@@ -7,9 +7,12 @@ import {
   DataProviderKey,
   FeatureDefinition,
   FeatureKey,
+  FrontendFrameworkDefinition,
+  FrontendFrameworkKey,
   Language,
   dataProviderCatalogMap,
   featureCatalogMap,
+  frontendFrameworkCatalogMap,
 } from './types';
 
 export interface DependencyItem {
@@ -30,6 +33,7 @@ export interface GenerateProjectOptions {
   features: FeatureKey[];
   packageManager: 'npm' | 'pnpm' | 'yarn';
   dataProviders: DataProviderKey[];
+  frontendFramework: FrontendFrameworkKey;
   dryRun?: boolean;
 }
 
@@ -49,6 +53,10 @@ export interface TemplateContext {
   dataProviders: DataProviderKey[];
   selectedDataProviders: DataProviderDefinition[];
   dataProviderSummaries: string[];
+  frontendFramework: FrontendFrameworkKey;
+  selectedFrontendFramework: FrontendFrameworkDefinition | null;
+  frontendAppDirectory: string | null;
+  frontendSummary: string | null;
   dependencies: DependencyItem[];
   devDependencies: DependencyItem[];
   scripts: Record<string, string>;
@@ -63,7 +71,15 @@ export abstract class BaseTemplateGenerator {
   constructor(private readonly templateRoot: string) {}
 
   async generate(options: GenerateProjectOptions) {
-    const { targetDirectory, features, dataProviders, projectName, language, packageManager } = options;
+    const {
+      targetDirectory,
+      features,
+      dataProviders,
+      projectName,
+      language,
+      packageManager,
+      frontendFramework,
+    } = options;
 
     if (!options.dryRun) {
       await fs.ensureDir(targetDirectory);
@@ -85,7 +101,38 @@ export abstract class BaseTemplateGenerator {
       return provider;
     });
 
+    const selectedFrontendDefinition =
+      frontendFramework !== 'none' ? frontendFrameworkCatalogMap.get(frontendFramework) : undefined;
+
+    if (frontendFramework !== 'none' && !selectedFrontendDefinition) {
+      throw new Error(`Framework front inconnu: ${frontendFramework}`);
+    }
+
     const dependencies = this.buildDependencies(language, features, dataProviders);
+
+    const frontendAppDirectory = selectedFrontendDefinition?.appDirectory ?? null;
+
+    if (selectedFrontendDefinition) {
+      const buildFrontendScript = (script: string) => {
+        if (packageManager === 'npm') {
+          return `npm run ${script} --prefix ${selectedFrontendDefinition.appDirectory}`;
+        }
+        if (packageManager === 'pnpm') {
+          return `pnpm --dir ${selectedFrontendDefinition.appDirectory} ${script}`;
+        }
+        return `yarn --cwd ${selectedFrontendDefinition.appDirectory} ${script}`;
+      };
+
+      if (frontendFramework === 'react-vite') {
+        dependencies.scripts['web:dev'] = buildFrontendScript('dev');
+        dependencies.scripts['web:build'] = buildFrontendScript('build');
+        dependencies.scripts['web:preview'] = buildFrontendScript('preview');
+      } else if (frontendFramework === 'nextjs') {
+        dependencies.scripts['web:dev'] = buildFrontendScript('dev');
+        dependencies.scripts['web:build'] = buildFrontendScript('build');
+        dependencies.scripts['web:start'] = buildFrontendScript('start');
+      }
+    }
 
     const packageName = formatPackageName(projectName);
     const packageManagerCommands = getPackageManagerCommands(packageManager);
@@ -100,6 +147,10 @@ export abstract class BaseTemplateGenerator {
       dataProviders,
       selectedDataProviders,
       dataProviderSummaries: selectedDataProviders.map((provider) => provider.summary),
+      frontendFramework,
+      selectedFrontendFramework: selectedFrontendDefinition ?? null,
+      frontendAppDirectory,
+      frontendSummary: selectedFrontendDefinition?.summary ?? null,
       dependencies: dependencies.dependencies,
       devDependencies: dependencies.devDependencies,
       scripts: dependencies.scripts,
@@ -188,3 +239,4 @@ function getPackageManagerCommands(packageManager: 'npm' | 'pnpm' | 'yarn'): Pac
       return { install: 'yarn install', run: 'yarn', exec: 'yarn dlx' };
   }
 }
+

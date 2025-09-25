@@ -3,11 +3,15 @@ import path from 'node:path';
 import {
   DataProviderKey,
   FeatureKey,
+  FrontendFrameworkKey,
   Language,
   dataProviderCatalog,
   dataProviderCatalogMap,
   featureCatalog,
   featureCatalogMap,
+  frontendFrameworkCatalog,
+  frontendFrameworkCatalogMap,
+  isFrontendFrameworkKey,
   resolveFeatureDependencies,
 } from '../generators/types';
 import { defaultTargetDirectory } from '../utils/project-name';
@@ -19,6 +23,7 @@ export interface PromptAnswers {
   features: FeatureKey[];
   packageManager: 'npm' | 'pnpm' | 'yarn';
   dataProviders: DataProviderKey[];
+  frontendFramework: FrontendFrameworkKey;
 }
 
 export interface PromptOptions {
@@ -28,6 +33,7 @@ export interface PromptOptions {
   features?: FeatureKey[];
   packageManager?: 'npm' | 'pnpm' | 'yarn';
   dataProviders?: DataProviderKey[];
+  frontendFramework?: FrontendFrameworkKey;
 }
 
 export async function promptForMissingOptions(options: PromptOptions): Promise<PromptAnswers> {
@@ -55,7 +61,7 @@ export async function promptForMissingOptions(options: PromptOptions): Promise<P
     questions.push({
       type: 'input',
       name: 'targetDirectory',
-      message: 'Dans quel dossier souhaitez-vous gÃ©nÃ©rer le template ? (il sera crÃ©Ã© si besoin)',
+      message: 'Dans quel dossier souhaitez-vous générer le template ? (il sera créé si besoin)',
       default: (answers: inquirer.Answers) => {
         const projectNameAnswer = (options.projectName ?? answers.projectName ?? '').toString().trim();
         return defaultTargetDirectory(projectNameAnswer || 'mon-api');
@@ -67,7 +73,7 @@ export async function promptForMissingOptions(options: PromptOptions): Promise<P
           return 'Indiquez un chemin de dossier valide.';
         }
         if (value === '.' || value === './' || value === './.' || value === '..') {
-          return 'Choisissez un dossier dÃ©diÃ© (Ã©vitez d\'Ã©craser le projet courant).';
+          return 'Choisissez un dossier dédié (évitez d\'écraser le projet courant).';
         }
         return true;
       },
@@ -81,7 +87,7 @@ export async function promptForMissingOptions(options: PromptOptions): Promise<P
       message: 'Choisissez un langage :',
       default: 'typescript',
       choices: [
-        { name: 'TypeScript (recommandÃ©)', value: 'typescript' },
+        { name: 'TypeScript (recommandé)', value: 'typescript' },
         { name: 'JavaScript (ESM)', value: 'javascript' },
       ],
     });
@@ -91,14 +97,14 @@ export async function promptForMissingOptions(options: PromptOptions): Promise<P
     questions.push({
       type: 'checkbox',
       name: 'features',
-      message: 'SÃ©lectionnez les modules Ã  inclure :',
+      message: 'Sélectionnez les modules à inclure :',
       choices: featureCatalog.map((feature) => ({
-        name: `${feature.name} â€” ${feature.description}`,
+        name: `${feature.name} – ${feature.description}`,
         value: feature.key,
       })),
       default: ['auth'],
       validate: (selected: FeatureKey[]) =>
-        selected.length > 0 ? true : 'SÃ©lectionnez au moins un module pour dÃ©marrer.',
+        selected.length > 0 ? true : 'Sélectionnez au moins un module pour démarrer.',
     });
   }
 
@@ -120,12 +126,28 @@ export async function promptForMissingOptions(options: PromptOptions): Promise<P
     questions.push({
       type: 'checkbox',
       name: 'dataProviders',
-      message: 'PrÃ©parez-vous une base de donnÃ©es ou un stockage objet ? (plusieurs choix possibles)',
+      message: 'Préparez-vous une base de données ou un stockage objet ? (plusieurs choix possibles)',
       choices: dataProviderCatalog.map((provider) => ({
-        name: `${provider.name} â€” ${provider.description}`,
+        name: `${provider.name} – ${provider.description}`,
         value: provider.key,
       })),
       default: [],
+    });
+  }
+
+  if (!options.frontendFramework) {
+    questions.push({
+      type: 'list',
+      name: 'frontendFramework',
+      message: 'Souhaitez-vous générer un front ? (facultatif)',
+      default: 'none',
+      choices: [
+        { name: 'Aucun (je gérerai le front plus tard)', value: 'none' },
+        ...frontendFrameworkCatalog.map((framework) => ({
+          name: `${framework.name} – ${framework.description}`,
+          value: framework.key,
+        })),
+      ],
     });
   }
 
@@ -145,12 +167,22 @@ export async function promptForMissingOptions(options: PromptOptions): Promise<P
     new Set((options.dataProviders ?? answers.dataProviders ?? []) as DataProviderKey[])
   );
 
+  const frontendFrameworkInput = options.frontendFramework ?? answers.frontendFramework ?? 'none';
+  if (!isFrontendFrameworkKey(frontendFrameworkInput)) {
+    throw new Error(
+      `Framework front inconnu : ${frontendFrameworkInput}. Valeurs possibles : none, ${frontendFrameworkCatalog
+        .map((framework) => framework.key)
+        .join(', ')}`
+    );
+  }
+  const frontendFramework: FrontendFrameworkKey = frontendFrameworkInput;
+
   const missingDependencies = resolvedFeatures.filter((featureKey) =>
     featureCatalogMap.get(featureKey)?.dependencies?.some((dependency) => !resolvedFeatures.includes(dependency))
   );
 
   if (missingDependencies.length > 0) {
-    throw new Error(`Impossible de rÃ©soudre les dÃ©pendances des modules : ${missingDependencies.join(', ')}`);
+    throw new Error(`Impossible de résoudre les dépendances des modules : ${missingDependencies.join(', ')}`);
   }
 
   const unknownProviders = dataProviders.filter((provider) => !dataProviderCatalogMap.has(provider));
@@ -165,5 +197,6 @@ export async function promptForMissingOptions(options: PromptOptions): Promise<P
     features: resolvedFeatures,
     packageManager,
     dataProviders,
+    frontendFramework,
   };
 }

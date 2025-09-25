@@ -1,0 +1,93 @@
+﻿import { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  fetchProfile,
+  login as loginRequest,
+  logout as logoutRequest,
+  type LoginResult,
+  type ProfileResult,
+} from '../api/client';
+
+interface Credentials {
+  email: string;
+  password: string;
+}
+
+interface AuthState {
+  tokens: LoginResult['tokens'] | null;
+  profile: ProfileResult | null;
+  loading: boolean;
+  error: string | null;
+}
+
+const INITIAL_STATE: AuthState = {
+  tokens: null,
+  profile: null,
+  loading: false,
+  error: null,
+};
+
+export function useAuthSession() {
+  const [state, setState] = useState<AuthState>(INITIAL_STATE);
+  const tokensRef = useRef<LoginResult['tokens'] | null>(null);
+
+  const login = useCallback(async ({ email, password }: Credentials) => {
+    setState((prev) => ({ ...prev, loading: true, error: null }));
+
+    try {
+      const result = await loginRequest(email, password);
+      const profile = await fetchProfile(result.tokens.accessToken);
+
+      tokensRef.current = result.tokens;
+      setState({ tokens: result.tokens, profile, loading: false, error: null });
+
+      return profile;
+    } catch (error) {
+      tokensRef.current = null;
+      const message = (error as Error).message || 'Impossible de se connecter.';
+      setState({ tokens: null, profile: null, loading: false, error: message });
+      throw error;
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
+    const tokens = tokensRef.current;
+    if (!tokens) {
+      setState((prev) => ({ ...prev, tokens: null, profile: null }));
+      return;
+    }
+
+    setState((prev) => ({ ...prev, loading: true }));
+
+    try {
+      await logoutRequest(tokens.accessToken, tokens.refreshToken);
+    } catch (error) {
+      const message = (error as Error).message || 'La déconnexion a échoué.';
+      setState((prev) => ({ ...prev, error: message }));
+    } finally {
+      tokensRef.current = null;
+      setState((prev) => ({ ...prev, tokens: null, profile: null, loading: false }));
+    }
+  }, []);
+
+  const clearError = useCallback(() => {
+    setState((prev) => ({ ...prev, error: null }));
+  }, []);
+
+  const context = useMemo(
+    () => ({
+      tokens: state.tokens,
+      profile: state.profile,
+      loading: state.loading,
+      error: state.error,
+      isAuthenticated: Boolean(state.profile),
+    }),
+    [state.tokens, state.profile, state.loading, state.error]
+  );
+
+  return {
+    ...context,
+    login,
+    logout,
+    clearError,
+  };
+}

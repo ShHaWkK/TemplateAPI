@@ -1,0 +1,10 @@
+﻿{
+  "repositories": {
+    "users": "<%= hasPrisma ? 'auto' : 'in-memory' %>",
+    "refreshTokens": "<%= hasPrisma ? 'auto' : 'in-memory' %>"
+  },
+  "fallback": {
+    "users": "in-memory",
+    "refreshTokens": "in-memory"
+  }
+}

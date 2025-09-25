@@ -1,6 +1,9 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import type { DataProviderDescriptor } from '../../domain/status/system-info';
+<% if (dataProviders.includes('prisma')) { %>
+import type { PrismaClient } from '@prisma/client';
+<% } %>
 
 const DIAGNOSTIC_TIMEOUT = 2500;
 
@@ -8,8 +11,8 @@ type Evaluator = (descriptor: DataProviderDescriptor) => Promise<DataProviderDes
 
 function formatMissingEnvMessage(keys: string[]): string {
   return keys.length === 1
-    ? `Variable d'environnement manquante : ${keys[0]}.`
-    : `Variables d'environnement manquantes : ${keys.join(', ')}.`;
+    ? `Variable d\'environnement manquante : ${keys[0]}.`
+    : `Variables d\'environnement manquantes : ${keys.join(', ')}.`;
 }
 
 function sanitizeString(value: string | undefined): string | undefined {
@@ -29,7 +32,7 @@ const evaluators: Record<string, Evaluator> = {
       return {
         ...descriptor,
         status: 'warning',
-        details: "Définissez DATABASE_URL pour activer la connexion PostgreSQL.",
+        details: 'Definissez DATABASE_URL pour activer la connexion PostgreSQL.',
       };
     }
 
@@ -42,7 +45,7 @@ const evaluators: Record<string, Evaluator> = {
       return {
         ...descriptor,
         status: 'ok',
-        details: 'Connexion PostgreSQL opérationnelle.',
+        details: 'Connexion PostgreSQL operationnelle.',
       };
     } catch (error) {
       return {
@@ -63,7 +66,7 @@ const evaluators: Record<string, Evaluator> = {
       return {
         ...descriptor,
         status: 'warning',
-        details: 'Définissez MYSQL_DSN pour activer la connexion MySQL.',
+        details: 'Definissez MYSQL_DSN pour activer la connexion MySQL.',
       };
     }
 
@@ -84,7 +87,7 @@ const evaluators: Record<string, Evaluator> = {
         return {
           ...descriptor,
           status: 'ok',
-          details: 'Connexion MySQL opérationnelle.',
+          details: 'Connexion MySQL operationnelle.',
         };
       } finally {
         await connection.end().catch(() => undefined);
@@ -106,7 +109,7 @@ const evaluators: Record<string, Evaluator> = {
       return {
         ...descriptor,
         status: 'warning',
-        details: 'Définissez SQLITE_DATABASE_PATH pour activer SQLite.',
+        details: 'Definissez SQLITE_DATABASE_PATH pour activer SQLite.',
       };
     }
 
@@ -125,7 +128,7 @@ const evaluators: Record<string, Evaluator> = {
       return {
         ...descriptor,
         status: 'ok',
-        details: `Base SQLite prête (${resolvedPath}).`,
+        details: `Base SQLite prete (${resolvedPath}).`,
       };
     } catch (error) {
       return {
@@ -142,17 +145,43 @@ const evaluators: Record<string, Evaluator> = {
 
     try {
       await fs.access(schemaPath);
-      return {
-        ...descriptor,
-        status: 'ok',
-        details: 'Schéma Prisma détecté. Exécutez `prisma generate` pour générer le client.',
-      };
     } catch {
       return {
         ...descriptor,
         status: 'warning',
-        details: 'Initialisez Prisma avec `npx prisma init` pour créer prisma/schema.prisma.',
+        details: 'Initialisez Prisma avec `npm run prisma:generate` pour creer prisma/schema.prisma.',
       };
+    }
+
+    const connectionString = sanitizeString(process.env.DATABASE_URL);
+
+    if (!connectionString) {
+      return {
+        ...descriptor,
+        status: 'warning',
+        details: 'Definissez DATABASE_URL pour activer Prisma/PostgreSQL.',
+      };
+    }
+
+    let prismaClient: PrismaClient | undefined;
+
+    try {
+      const { PrismaClient } = await import('@prisma/client');
+      prismaClient = new PrismaClient();
+      await prismaClient.$queryRaw`SELECT 1`;
+      return {
+        ...descriptor,
+        status: 'ok',
+        details: 'Connexion Prisma/PostgreSQL operationnelle.',
+      };
+    } catch (error) {
+      return {
+        ...descriptor,
+        status: 'critical',
+        details: `Connexion Prisma impossible : ${(error as Error).message}`,
+      };
+    } finally {
+      await prismaClient?.$disconnect().catch(() => undefined);
     }
   },
 <% } %>
@@ -201,13 +230,13 @@ const evaluators: Record<string, Evaluator> = {
       return {
         ...descriptor,
         status: 'ok',
-        details: `Configuration S3 détectée pour le bucket ${bucket}.`,
+        details: `Configuration S3 detectee pour le bucket ${bucket}.`,
       };
     } catch (error) {
       return {
         ...descriptor,
         status: 'warning',
-        details: `Client S3 non initialisé : ${(error as Error).message}`,
+        details: `Client S3 non initialise : ${(error as Error).message}`,
       };
     }
   },
@@ -240,3 +269,4 @@ export async function evaluateDataProviders(
     })
   );
 }
+

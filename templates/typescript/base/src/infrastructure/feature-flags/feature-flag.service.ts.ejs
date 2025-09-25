@@ -1,0 +1,25 @@
+﻿import { FeatureFlagStore, FeatureFlagSnapshot } from './feature-flag.store';
+
+class FeatureFlagService {
+  private readonly store = new FeatureFlagStore();
+
+  getSnapshot(): FeatureFlagSnapshot {
+    return this.store.getSnapshot();
+  }
+
+  isEnabled(flagKey: string): boolean {
+    const snapshot = this.store.getSnapshot();
+    return Boolean(snapshot.flags[flagKey]);
+  }
+
+  setFlag(flagKey: string, enabled: boolean): FeatureFlagSnapshot {
+    return this.store.setFlag(flagKey, enabled);
+  }
+
+  toggle(flagKey: string): FeatureFlagSnapshot {
+    const current = this.isEnabled(flagKey);
+    return this.setFlag(flagKey, !current);
+  }
+}
+
+export const featureFlagService = new FeatureFlagService();

@@ -1,7 +1,9 @@
-import { Router } from 'express';
+﻿import { Router } from 'express';
 import { healthController } from '../controllers/health.controller';
 import { statusController } from '../controllers/status.controller';
 import { asyncHandler } from '../utils/async-handler';
+import { featureFlagRoutes } from './feature-flags.routes';
+import { requireFeature } from '../middlewares/require-feature';
 <% if (features.includes('auth')) { %>
 import { authRoutes } from './auth.routes';
 import { profileController } from '../controllers/profile.controller';
@@ -22,18 +24,42 @@ const routes = Router();
 
 routes.get('/status', asyncHandler((request, response) => statusController.handle(request, response)));
 routes.get('/health', (request, response) => healthController.handle(request, response));
+routes.use('/feature-flags', featureFlagRoutes);
 <% if (features.includes('auth')) { %>
-routes.use('/auth', authRoutes);
-routes.get('/me', ensureAuthenticated, (request, response) => profileController.handle(request, response));
+routes.use('/auth', requireFeature('auth'), authRoutes);
+routes.get(
+  '/me',
+  ensureAuthenticated,
+  requireFeature('auth'),
+  (request, response) => profileController.handle(request, response)
+);
 <% } %>
 <% if (features.includes('userCrud')) { %>
-routes.use('/users', ensureAuthenticated, requireRole('admin'), userRoutes);
+routes.use(
+  '/users',
+  ensureAuthenticated,
+  requireRole('admin'),
+  requireFeature('userCrud'),
+  userRoutes
+);
 <% } %>
 <% if (features.includes('clientPortal')) { %>
-routes.use('/client', ensureAuthenticated, requireRole('client'), clientPortalRoutes);
+routes.use(
+  '/client',
+  ensureAuthenticated,
+  requireRole('client'),
+  requireFeature('clientPortal'),
+  clientPortalRoutes
+);
 <% } %>
 <% if (features.includes('adminPortal')) { %>
-routes.use('/admin', ensureAuthenticated, requireRole('admin'), adminPortalRoutes);
+routes.use(
+  '/admin',
+  ensureAuthenticated,
+  requireRole('admin'),
+  requireFeature('adminPortal'),
+  adminPortalRoutes
+);
 <% } %>
 
 export { routes };

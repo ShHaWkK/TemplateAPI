@@ -1,0 +1,138 @@
+﻿import fs from 'node:fs';
+import path from 'node:path';
+import { logger } from '../logging/logger';
+<% if (features.includes('auth')) { %>
+import { InMemoryUserRepository } from './in-memory/in-memory-user.repository';
+import { InMemoryRefreshTokenRepository } from './in-memory/in-memory-refresh-token.repository';
+import type { UserRepository } from '../../domain/repositories/user-repository';
+import type { RefreshTokenRepository } from '../../domain/repositories/refresh-token-repository';
+<% if (hasPrisma) { %>
+import { PrismaUserRepository } from './prisma/prisma-user.repository';
+import { PrismaRefreshTokenRepository } from './prisma/prisma-refresh-token.repository';
+import { getPrismaClient, hasDatabaseUrlConfigured, disconnectPrismaClient } from './prisma/prisma-client';
+<% } %>
+<% } %>
+
+interface ProviderSelectionConfig {
+  repositories?: {
+    users?: string;
+    refreshTokens?: string;
+  };
+  fallback?: {
+    users?: string;
+    refreshTokens?: string;
+  };
+}
+
+const DEFAULT_CONFIG: ProviderSelectionConfig = {
+  repositories: {
+    users: '<%= hasPrisma ? 'auto' : 'in-memory' %>',
+    refreshTokens: '<%= hasPrisma ? 'auto' : 'in-memory' %>',
+  },
+  fallback: {
+    users: 'in-memory',
+    refreshTokens: 'in-memory',
+  },
+};
+
+const PROVIDERS_CONFIG_PATH = path.resolve(process.cwd(), 'config', 'providers.json');
+
+function loadProvidersConfig(): ProviderSelectionConfig {
+  try {
+    const raw = fs.readFileSync(PROVIDERS_CONFIG_PATH, 'utf8');
+    const parsed = JSON.parse(raw) as ProviderSelectionConfig;
+    return {
+      ...DEFAULT_CONFIG,
+      ...parsed,
+      repositories: {
+        ...DEFAULT_CONFIG.repositories,
+        ...parsed.repositories,
+      },
+      fallback: {
+        ...DEFAULT_CONFIG.fallback,
+        ...parsed.fallback,
+      },
+    };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      logger.warn({ err: error }, 'Impossible de lire config/providers.json, utilisation des valeurs par défaut.');
+    }
+    return DEFAULT_CONFIG;
+  }
+}
+
+function resolveSelection(selection: string | undefined, fallback: string | undefined): string {
+  const normalized = (selection ?? 'auto').toLowerCase();
+  if (normalized === 'auto') {
+<% if (hasPrisma) { %>
+    if (hasDatabaseUrlConfigured()) {
+      return 'prisma';
+    }
+<% } %>
+    return (fallback ?? 'in-memory').toLowerCase();
+  }
+  return normalized;
+}
+
+<% if (features.includes('auth')) { %>
+let userRepository: UserRepository | null = null;
+let refreshTokenRepository: RefreshTokenRepository | null = null;
+
+function buildUserRepository(providerKey: string): UserRepository {
+  switch (providerKey) {
+    case 'in-memory':
+      return new InMemoryUserRepository();
+<% if (hasPrisma) { %>
+    case 'prisma':
+      return new PrismaUserRepository(getPrismaClient());
+<% } %>
+    default:
+      logger.warn({ providerKey }, "Provider d'utilisateur inconnu. Retour à l'in-memory.");
+      return new InMemoryUserRepository();
+  }
+}
+
+function buildRefreshTokenRepository(providerKey: string): RefreshTokenRepository {
+  switch (providerKey) {
+    case 'in-memory':
+      return new InMemoryRefreshTokenRepository();
+<% if (hasPrisma) { %>
+    case 'prisma':
+      return new PrismaRefreshTokenRepository(getPrismaClient());
+<% } %>
+    default:
+      logger.warn({ providerKey }, 'Provider de refresh token inconnu. Retour à l\'in-memory.');
+      return new InMemoryRefreshTokenRepository();
+  }
+}
+
+export function resolveUserRepository(): UserRepository {
+  if (!userRepository) {
+    const config = loadProvidersConfig();
+    const providerKey = resolveSelection(config.repositories?.users, config.fallback?.users);
+    userRepository = buildUserRepository(providerKey);
+    logger.info({ providerKey }, 'Référentiel utilisateur initialisé.');
+  }
+  return userRepository;
+}
+
+export function resolveRefreshTokenRepository(): RefreshTokenRepository {
+  if (!refreshTokenRepository) {
+    const config = loadProvidersConfig();
+    const providerKey = resolveSelection(config.repositories?.refreshTokens, config.fallback?.refreshTokens);
+    refreshTokenRepository = buildRefreshTokenRepository(providerKey);
+    logger.info({ providerKey }, 'Référentiel de refresh token initialisé.');
+  }
+  return refreshTokenRepository;
+}
+
+export async function shutdownPersistence(): Promise<void> {
+<% if (hasPrisma) { %>
+  await disconnectPrismaClient().catch((error) => {
+    logger.error({ err: error }, 'Erreur lors de la fermeture du client Prisma.');
+  });
+<% } %>
+  userRepository = null;
+  refreshTokenRepository = null;
+}
+<% } %>

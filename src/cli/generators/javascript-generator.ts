@@ -89,8 +89,12 @@ export class JavaScriptTemplateGenerator extends BaseTemplateGenerator {
     if (dataProviders.includes('prisma')) {
       scripts['prisma:generate'] = 'prisma generate';
       scripts['prisma:migrate'] = 'prisma migrate dev';
+      scripts['prisma:deploy'] = 'prisma migrate deploy';
       scripts['prisma:studio'] = 'prisma studio';
+      scripts['db:migrate'] = 'prisma migrate deploy';
+      scripts['db:seed'] = 'node prisma/seed.js';
     }
+
 
     return {
       dependencies,
@@ -106,7 +110,9 @@ export class JavaScriptTemplateGenerator extends BaseTemplateGenerator {
       hasUserCrud: options.features.includes('userCrud'),
       hasClientPortal: options.features.includes('clientPortal'),
       hasAdminPortal: options.features.includes('adminPortal'),
-      hasDatabaseProviders: options.dataProviders.some((provider) => provider === 'postgresql' || provider === 'mysql' || provider === 'sqlite'),
+      hasDatabaseProviders: options.dataProviders.some((provider) =>
+        ['postgresql', 'mysql', 'sqlite', 'prisma'].includes(provider)
+      ),
       hasPrisma: options.dataProviders.includes('prisma'),
       hasObjectStorage: options.dataProviders.includes('s3'),
     };
@@ -117,7 +123,9 @@ export class JavaScriptTemplateGenerator extends BaseTemplateGenerator {
       return null;
     }
 
-    if (filePath.endsWith('.ts')) {
+    const isWebClientAsset = filePath.includes(`${path.sep}apps${path.sep}web${path.sep}`);
+
+    if (!isWebClientAsset && filePath.endsWith('.ts')) {
       const transpiled = ts.transpileModule(content, {
         compilerOptions: {
           module: ts.ModuleKind.CommonJS,
@@ -127,6 +135,20 @@ export class JavaScriptTemplateGenerator extends BaseTemplateGenerator {
       });
 
       const fileName = path.basename(filePath).replace(/\.ts$/, '.js');
+      return { content: transpiled.outputText, fileName };
+    }
+
+    if (!isWebClientAsset && filePath.endsWith('.tsx')) {
+      const transpiled = ts.transpileModule(content, {
+        compilerOptions: {
+          module: ts.ModuleKind.ESNext,
+          target: ts.ScriptTarget.ES2021,
+          esModuleInterop: true,
+          jsx: ts.JsxEmit.ReactJSX,
+        },
+      });
+
+      const fileName = path.basename(filePath).replace(/\.tsx$/, '.jsx');
       return { content: transpiled.outputText, fileName };
     }
 
@@ -157,5 +179,19 @@ export class JavaScriptTemplateGenerator extends BaseTemplateGenerator {
         await this.copyTemplateDirectory(featureDir, options.targetDirectory, context);
       }
     }
+
+    if (!options.dataProviders.includes('prisma')) {
+      const prismaDir = path.join(options.targetDirectory, 'prisma');
+      const prismaSrcDir = path.join(options.targetDirectory, 'src', 'infrastructure', 'persistence', 'prisma');
+
+      if (await fs.pathExists(prismaDir)) {
+        await fs.remove(prismaDir);
+      }
+
+      if (await fs.pathExists(prismaSrcDir)) {
+        await fs.remove(prismaSrcDir);
+      }
+    }
   }
 }
+

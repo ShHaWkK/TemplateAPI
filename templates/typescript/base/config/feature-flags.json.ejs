@@ -1,0 +1,16 @@
+﻿<%
+  const defaultFlags = {};
+  selectedFeatures.forEach((feature) => {
+    defaultFlags[feature.key] = true;
+  });
+  const optionalFlags = ['audit', 'files', 'observability', 'webhooks'];
+  optionalFlags.forEach((flag) => {
+    if (!(flag in defaultFlags)) {
+      defaultFlags[flag] = false;
+    }
+  });
+%>
+{
+  "flags": <%- JSON.stringify(defaultFlags, null, 2) %>,
+  "updatedAt": "1970-01-01T00:00:00.000Z"
+}

@@ -1,0 +1,112 @@
+﻿import { useCallback, useEffect, useRef, useState } from 'react';
+import { fetchStatus, type StatusSnapshot } from '../api/client';
+
+type ApiHealth = 'ok' | 'degraded' | 'critical' | 'unknown';
+
+interface UseApiStatusOptions {
+  pollIntervalMs?: number;
+}
+
+interface RefreshOptions {
+  silent?: boolean;
+}
+
+interface ApiStatusState {
+  snapshot?: StatusSnapshot;
+  isLoading: boolean;
+  isRefreshing: boolean;
+  error: string | null;
+  lastUpdated?: Date;
+}
+
+const INITIAL_STATE: ApiStatusState = {
+  snapshot: undefined,
+  isLoading: true,
+  isRefreshing: false,
+  error: null,
+  lastUpdated: undefined,
+};
+
+export function useApiStatus(options: UseApiStatusOptions = {}) {
+  const { pollIntervalMs = 15000 } = options;
+  const [state, setState] = useState<ApiStatusState>(INITIAL_STATE);
+  const abortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      abortRef.current?.abort();
+    };
+  }, []);
+
+  const refresh = useCallback(async ({ silent }: RefreshOptions = {}) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setState((prev) => {
+      const hasSnapshot = Boolean(prev.snapshot);
+      return {
+        ...prev,
+        isLoading: silent ? prev.isLoading : !hasSnapshot,
+        isRefreshing: silent ? true : hasSnapshot,
+        error: silent ? prev.error : null,
+      };
+    });
+
+    try {
+      const snapshot = await fetchStatus(controller.signal);
+      if (!mountedRef.current || controller.signal.aborted) {
+        return;
+      }
+
+      setState({
+        snapshot,
+        isLoading: false,
+        isRefreshing: false,
+        error: null,
+        lastUpdated: new Date(),
+      });
+    } catch (error) {
+      if (!mountedRef.current || controller.signal.aborted) {
+        return;
+      }
+
+      setState((prev) => ({
+        ...prev,
+        isLoading: false,
+        isRefreshing: false,
+        error: (error as Error).message ?? 'Impossible de récupérer le statut API.',
+      }));
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!pollIntervalMs) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      void refresh({ silent: true });
+    }, pollIntervalMs);
+
+    return () => window.clearInterval(timer);
+  }, [pollIntervalMs, refresh]);
+
+  const status: ApiHealth = (state.snapshot?.status as ApiHealth) ?? 'unknown';
+
+  return {
+    snapshot: state.snapshot,
+    isLoading: state.isLoading,
+    isRefreshing: state.isRefreshing,
+    error: state.error,
+    lastUpdated: state.lastUpdated,
+    status,
+    refresh,
+  };
+}

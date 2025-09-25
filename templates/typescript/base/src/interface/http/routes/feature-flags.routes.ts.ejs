@@ -1,0 +1,17 @@
+﻿import { Router } from 'express';
+import { featureFlagsController } from '../controllers/feature-flags.controller';
+import { asyncHandler } from '../utils/async-handler';
+
+const featureFlagRoutes = Router();
+
+featureFlagRoutes.get('/', (request, response) => featureFlagsController.list(request, response));
+featureFlagRoutes.put(
+  '/:flagKey',
+  asyncHandler((request, response) => featureFlagsController.update(request, response))
+);
+featureFlagRoutes.post(
+  '/:flagKey/toggle',
+  asyncHandler((request, response) => featureFlagsController.toggle(request, response))
+);
+
+export { featureFlagRoutes };

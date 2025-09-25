@@ -9,46 +9,19 @@ on:
 jobs:
   build-test:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15-alpine
-        ports:
-          - 5432:5432
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: template
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/template?schema=public
-      JWT_SECRET: ci-secret-ci-secret-ci-secret-1234567890
-      JWT_EXPIRES_IN: 15m
-      REFRESH_TOKEN_TTL_MS: 604800000
-      RATE_LIMIT_WINDOW_MS: 900000
-      RATE_LIMIT_MAX: 100
-      ENABLE_SWAGGER: false
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: '18'
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm install
 
-      - name: Lint
-        run: npm run lint
+      - name: Type-check & unit tests
+        run: npm run test
 
-      - name: Run tests
-        run: npm test
-
-      - name: Build
+      - name: Build CLI
         run: npm run build
-
-      - name: Run migrations
-        run: npm run db:migrate

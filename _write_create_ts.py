@@ -25,7 +25,7 @@ function ensureSafeProjectDirectory(targetDir: string) {
 
   const stats = fs.statSync(targetDir);
   if (!stats.isDirectory()) {
-    throw new Error(`${targetDir} existe dÈj‡ et n'est pas un dossier.`);
+    throw new Error(`${targetDir} existe d√©j√© et n'est pas un dossier.`);
   }
 
   const files = fs.readdirSync(targetDir);
@@ -107,7 +107,7 @@ async function runShellCommand(command: string, cwd: string) {
       if (code === 0) {
         resolve();
       } else {
-        reject(new Error(`La commande "${command}" s'est terminÈe avec le code ${code}.`));
+        reject(new Error(`La commande "${command}" s'est termin√©e avec le code ${code}.`));
       }
     });
   });
@@ -137,7 +137,7 @@ async function scaffoldFrontend(options: {
   if (dryRun) {
     console.log(
       chalk.yellow(
-        `[dry-run] Front ${definition.name} gÈnÈrÈ dans ${toPosixPath(relativeForDisplay)} (aucune commande exÈcutÈe).`
+        `[dry-run] Front ${definition.name} g√©n√©r√© dans ${toPosixPath(relativeForDisplay)} (aucune commande ex√©cut√©e).`
       )
     );
     return { framework, directory: frontendDir };
@@ -145,23 +145,23 @@ async function scaffoldFrontend(options: {
 
   if (await fs.pathExists(frontendDir)) {
     throw new Error(
-      `Le dossier ${toPosixPath(relativeForDisplay)} existe dÈj‡. Supprimez-le ou choisissez un autre emplacement pour le front.`
+      `Le dossier ${toPosixPath(relativeForDisplay)} existe d√©j√©. Supprimez-le ou choisissez un autre emplacement pour le front.`
     );
   }
 
   await fs.ensureDir(path.dirname(frontendDir));
 
-  console.log('\n' + chalk.cyan(`[Front] GÈnÈration ${definition.name}...`));
+  console.log('\n' + chalk.cyan(`[Front] G√©n√©ration ${definition.name}...`));
 
   if (framework === 'react-vite') {
     await scaffoldReactVite(frontendDir, targetDirectory, packageManager, projectName, definition.envFileName);
   } else if (framework === 'nextjs') {
     await scaffoldNextJs(frontendDir, targetDirectory, packageManager, projectName, definition.envFileName);
   } else {
-    throw new Error(`Framework front non supportÈ: ${framework}`);
+    throw new Error(`Framework front non support√©: ${framework}`);
   }
 
-  console.log(chalk.green(`[OK] Front ${definition.name} prÍt dans ${toPosixPath(relativeForDisplay)}.`));
+  console.log(chalk.green(`[OK] Front ${definition.name} pr√©t dans ${toPosixPath(relativeForDisplay)}.`));
 
   return { framework, directory: frontendDir };
 }
@@ -234,10 +234,10 @@ async function customizeReactVite(frontendDir: string, projectName: string, envF
     '',
     '  return (',
     '    <main className="layout">',
-    f"      <h1>{safeProjectName} ∑ Console API</h1>",
-    "      <p>Cette interface interroge <code>GET /status</code> de l'API gÈnÈrÈe.</p>",
+    f"      <h1>{safeProjectName} √© Console API</h1>",
+    "      <p>Cette interface interroge <code>GET /status</code> de l'API g√©n√©r√©e.</p>",
     '      <div className="panel">',
-    '        {loading ? <p>ChargementÖ</p> : null}',
+    '        {loading ? <p>Chargement√©</p> : null}',
     '        {error ? <p className="error">{error}</p> : null}',
     '        {!loading && !error ? (',
     '          <pre>{JSON.stringify(status, null, 2)}</pre>',
@@ -342,8 +342,8 @@ async function customizeNextJs(frontendDir: string, projectName: string, envFile
     "import './globals.css';",
     '',
     'export const metadata: Metadata = {',
-    f"  title: '{safeProjectName} ∑ Console API',",
-    "  description: \"Interface front gÈnÈrÈe avec create-template-api pour consommer l'API.\",",
+    f"  title: '{safeProjectName} √© Console API',",
+    "  description: \"Interface front g√©n√©r√©e avec create-template-api pour consommer l'API.\",",
     '};',
     '',
     'export default function RootLayout({ children }: { children: React.ReactNode }) {',
@@ -364,8 +364,8 @@ async function customizeNextJs(frontendDir: string, projectName: string, envFile
     '',
     '  return (',
     '    <main className="layout">',
-    f"      <h1>{safeProjectName} ∑ Console API</h1>",
-    "      <p>Cette page interroge <code>GET /status</code> du backend cÙtÈ serveur.</p>",
+    f"      <h1>{safeProjectName} √© Console API</h1>",
+    "      <p>Cette page interroge <code>GET /status</code> du backend c√©t√© serveur.</p>",
     '      <pre>{JSON.stringify(status, null, 2)}</pre>',
     '    </main>',
     '  );',
@@ -442,7 +442,7 @@ export async function runCreateCommand(directoryArg: string | undefined, options
   const relativePath = path.relative(process.cwd(), targetDirectory) || '.';
 
   let instructions = (
-    f"\n{chalk.bold('Prochaines Ètapes :')}\n"
+    f"\n{chalk.bold('Prochaines √©tapes :')}\n"
     + f"  {chalk.cyan(f'cd {relativePath}')}\n"
     + f"  {chalk.cyan(getPackageManagerCommand(answers.packageManager, 'install'))}\n"
     + f"  {chalk.cyan(getPackageManagerCommand(answers.packageManager, 'test'))} (optionnel)\n"
@@ -466,7 +466,7 @@ export async function runCreateCommand(directoryArg: string | undefined, options
     );
   }
 
-  console.log('\n' + chalk.green('[OK] Template API gÈnÈrÈ avec succËs !'));
+  console.log('\n' + chalk.green('[OK] Template API g√©n√©r√© avec succ√©s !'));
   console.log(instructions);
 
   if (options.dryRun) {
@@ -477,7 +477,7 @@ export async function runCreateCommand(directoryArg: string | undefined, options
     {
       type: 'confirm',
       name: 'shouldRunTests',
-      message: 'Souhaitez-vous installer les dÈpendances et lancer la suite de tests maintenant ?',
+      message: 'Souhaitez-vous installer les d√©pendances et lancer la suite de tests maintenant ?',
       default: true,
     },
   ]);
@@ -490,19 +490,19 @@ export async function runCreateCommand(directoryArg: string | undefined, options
   const testCommand = getPackageManagerCommand(answers.packageManager, 'test');
 
   try {
-    console.log('\n' + chalk.cyan(f"Installation des dÈpendances ({installCommand})..."));
+    console.log('\n' + chalk.cyan(f"Installation des d√©pendances ({installCommand})..."));
     await runShellCommand(installCommand, targetDirectory);
 
-    console.log('\n' + chalk.cyan(f"ExÈcution des tests ({testCommand})..."));
+    console.log('\n' + chalk.cyan(f"Ex√©cution des tests ({testCommand})..."));
     await runShellCommand(testCommand, targetDirectory);
 
-    console.log('\n' + chalk.green('[OK] Tests exÈcutÈs avec succËs.'));
+    console.log('\n' + chalk.green('[OK] Tests ex√©cut√©s avec succ√©s.'));
   } catch (error) {
     const message = error instanceof Error ? error.message : str(error);
-    console.error('\n' + chalk.red(f"[ERREUR] Les tests n'ont pas pu Ítre exÈcutÈs automatiquement : {message}"));
+    console.error('\n' + chalk.red(f"[ERREUR] Les tests n'ont pas pu √©tre ex√©cut√©s automatiquement : {message}"));
     console.error(
       chalk.yellow(
-        'Vous pouvez relancer manuellement les commandes indiquÈes dans les Ètapes ci-dessus une fois prÍt.'
+        'Vous pouvez relancer manuellement les commandes indiqu√©es dans les √©tapes ci-dessus une fois pr√©t.'
       )
     );
   }

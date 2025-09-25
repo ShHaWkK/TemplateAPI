@@ -99,6 +99,20 @@ curl -H "Authorization: Bearer ${ACCESS_TOKEN}" http://localhost:3333/me
 <% Object.entries(scripts).forEach(([name, command]) => { %>| <%- name %> | `<%- command %>` |
 <% }); %>
 
+<% if (selectedFrontendFramework) { %>
+## Front-end (<%- frontendAppDirectory %>)
+
+Une application <%- selectedFrontendFramework.name %> est gÃ©nÃ©rÃ©e pour explorer l'API (appel initial de GET /status).
+
+`ash
+<%- packageManagerCommands.run %> web:dev
+`
+
+- Code source : <%- frontendAppDirectory %>
+- Variables d'environnement : <%- frontendAppDirectory %>/<%- selectedFrontendFramework.envFileName %> (URL par dÃ©faut http://localhost:3333).
+- Utilisez web:build pour produire les assets puis web:preview ou web:start selon le framework choisi.
+<% } %>
+
 ## ðŸ“š Documentation
 
 - Swagger/OpenAPI disponible sur [`/docs`](http://localhost:3333/docs).
@@ -132,3 +146,18 @@ utilisateurs (crÃ©ation, consultation, mise Ã  jour, suppression) et espaces cli
 - Ã‰tendez la documentation via `src/interface/http/docs/openapi.ts`.
 
 Bon dÃ©veloppement ! ðŸš€
+## Feature flags dynamiques
+
+- Configurez config/feature-flags.json pour activer/désactiver une fonctionnalité au démarrage.
+- API dédiée :
+  - GET /feature-flags retourne l'état courant.
+  - PUT /feature-flags/:flagKey avec { "enabled": true|false } met à jour un flag.
+  - POST /feature-flags/:flagKey/toggle bascule l'état.
+- Les routes critiques (/auth, /users, /client, /admin) appliquent ces toggles à chaud.
+
+## Registre de providers
+
+- Le fichier config/providers.json permet de choisir le provider de persistance à l'exécution (uto, prisma, in-memory).
+- Choisissez uto pour laisser le template sélectionner Prisma lorsque DATABASE_URL est défini, sinon l'implémentation in-memory est utilisée.
+- La commande 
+pm run dev recharge automatiquement la configuration lors du redémarrage.

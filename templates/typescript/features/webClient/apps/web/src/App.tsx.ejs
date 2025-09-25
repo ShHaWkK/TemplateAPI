@@ -1,0 +1,241 @@
+﻿import { type ChangeEvent, type FormEvent, useMemo, useState } from 'react';
+import { StatusGroup, mapSnapshotToGroups } from './components/StatusCard';
+import { useApiStatus } from './hooks/useApiStatus';
+import { useAuthSession } from './hooks/useAuthSession';
+
+const PROJECT_NAME = JSON.parse('<%- JSON.stringify(JSON.stringify(projectName)) %>') as const;
+const DEFAULT_CREDENTIALS = {
+  email: 'admin@example.com',
+  password: 'Admin#1234',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  ok: 'opérationnelle',
+  degraded: 'dégradée',
+  critical: 'instable',
+  unknown: 'indéterminée',
+};
+
+const STATUS_VARIANTS: Record<string, string> = {
+  ok: 'ok',
+  degraded: 'warning',
+  critical: 'critical',
+  unknown: 'unknown',
+};
+
+function formatLastUpdated(lastUpdated?: Date) {
+  if (!lastUpdated) {
+    return "Jamais synchronisée";
+  }
+
+  const deltaSeconds = Math.floor((Date.now() - lastUpdated.getTime()) / 1000);
+
+  if (deltaSeconds < 5) {
+    return "À l'instant";
+  }
+  if (deltaSeconds < 60) {
+    return `Il y a ${deltaSeconds} s`;
+  }
+  if (deltaSeconds < 3600) {
+    const minutes = Math.round(deltaSeconds / 60);
+    return `Il y a ${minutes} min`;
+  }
+  const hours = Math.round(deltaSeconds / 3600);
+  return `Il y a ${hours} h`;
+}
+
+export default function App() {
+  const [email, setEmail] = useState(DEFAULT_CREDENTIALS.email);
+  const [password, setPassword] = useState(DEFAULT_CREDENTIALS.password);
+
+  const {
+    snapshot,
+    status,
+    isLoading: statusLoading,
+    isRefreshing,
+    error: statusError,
+    lastUpdated,
+    refresh,
+  } = useApiStatus({ pollIntervalMs: 20000 });
+
+  const {
+    profile,
+    loading: authLoading,
+    error: authError,
+    isAuthenticated,
+    login,
+    logout,
+    clearError,
+  } = useAuthSession();
+
+  const groups = useMemo(() => mapSnapshotToGroups(snapshot), [snapshot]);
+
+  const flagItems = useMemo(() => {
+    if (!snapshot?.featureFlags) {
+      return [];
+    }
+    return Object.entries(snapshot.featureFlags).map(([flagKey, enabled]) => ({
+      label: flagKey,
+      status: enabled ? 'ok' : 'warning',
+      details: enabled ? 'Activée' : 'Désactivée',
+    }));
+  }, [snapshot?.featureFlags]);
+
+  const statusTone = STATUS_VARIANTS[status] ?? STATUS_VARIANTS.unknown;
+  const statusLabel = STATUS_LABELS[status] ?? STATUS_LABELS.unknown;
+  const lastUpdatedLabel = formatLastUpdated(lastUpdated);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    try {
+      await login({ email, password });
+    } catch {
+      // L'erreur est déjà remontée par le hook.
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+  };
+
+  const resetErrorOnInput = (updater: (value: string) => void) => (event: ChangeEvent<HTMLInputElement>) => {
+    if (authError) {
+      clearError();
+    }
+    updater(event.target.value);
+  };
+
+  return (
+    <main>
+      <header className="overview">
+        <div className="overview__heading">
+          <p className="eyebrow">Template API</p>
+          <h1>{PROJECT_NAME}</h1>
+        </div>
+
+        <div className={`status-callout status-${statusTone}`}>
+          <span className="status-callout__badge">API {statusLabel.toUpperCase()}</span>
+          <div className="status-callout__meta">
+            <p>
+              Console temps réel pour explorer l'API générée, suivre la santé des dépendances et valider les flux
+              d'authentification.
+            </p>
+            <div className="status-callout__timings">
+              <button
+                type="button"
+                onClick={refresh}
+                disabled={statusLoading && !snapshot}
+                aria-live="polite"
+              >
+                {statusLoading && !snapshot
+                  ? 'Chargement...'
+                  : isRefreshing
+                  ? 'Actualisation...'
+                  : 'Actualiser le statut'}
+              </button>
+              <span>{isRefreshing ? 'Synchronisation...' : `Dernière mise à jour : ${lastUpdatedLabel}`}</span>
+            </div>
+          </div>
+        </div>
+
+        {statusError ? (
+          <div className="alert" role="alert">
+            {statusError}
+          </div>
+        ) : null}
+      </header>
+
+      <section className="content">
+        <div className="dashboard" data-refreshing={isRefreshing}>
+          <StatusGroup
+            title="Feature Flags"
+            items={flagItems}
+            isLoading={statusLoading && !snapshot}
+            emptyMessage="Aucun feature flag déclaré."
+          />
+          <StatusGroup
+            title="Fonctionnalités"
+            items={groups.features}
+            isLoading={statusLoading && !snapshot}
+            emptyMessage="Aucune fonctionnalité activée pour le moment."
+          />
+          <StatusGroup
+            title="Dépendances"
+            items={groups.dependencies}
+            isLoading={statusLoading && !snapshot}
+            emptyMessage="Aucune dépendance externe déclarée."
+          />
+          <StatusGroup
+            title="Persistance"
+            items={groups.dataProviders}
+            isLoading={statusLoading && !snapshot}
+            emptyMessage="Ajoutez un provider (PostgreSQL, Prisma, S3...) lors de la génération."
+          />
+        </div>
+
+        <aside className="card auth-card">
+          <div className="auth-card__header">
+            <h3>Espace authentification</h3>
+            <p>
+              Utilisez les comptes de démonstration ou vos identifiants pour valider l'intégration JWT générée par
+              le template.
+            </p>
+          </div>
+
+          <form className="auth" onSubmit={handleSubmit}>
+            <label>
+              Email
+              <input
+                type="email"
+                value={email}
+                onChange={resetErrorOnInput(setEmail)}
+                required
+                autoComplete="username"
+              />
+            </label>
+            <label>
+              Mot de passe
+              <input
+                type="password"
+                value={password}
+                onChange={resetErrorOnInput(setPassword)}
+                required
+                autoComplete="current-password"
+              />
+            </label>
+
+            <button type="submit" disabled={authLoading}>
+              {authLoading ? 'Connexion...' : isAuthenticated ? 'Recharger le profil' : 'Se connecter'}
+            </button>
+
+            <div className="auth-card__hints">
+              <span>Démo admin : admin@example.com / Admin#1234</span>
+              <span>Démo client : client@example.com / Client#1234</span>
+            </div>
+          </form>
+
+          {authError ? (
+            <div className="alert" role="alert">
+              {authError}
+            </div>
+          ) : null}
+
+          {isAuthenticated && profile ? (
+            <div className="profile" data-variant="success">
+              <div>
+                <h4>Profil connecté</h4>
+                <p>
+                  {profile.name} — <code>{profile.email}</code>
+                </p>
+                <p>Rôle : {profile.role}</p>
+              </div>
+              <button type="button" className="secondary" onClick={handleLogout} disabled={authLoading}>
+                Se déconnecter
+              </button>
+            </div>
+          ) : null}
+        </aside>
+      </section>
+    </main>
+  );
+}

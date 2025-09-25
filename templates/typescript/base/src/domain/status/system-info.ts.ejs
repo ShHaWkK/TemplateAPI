@@ -1,4 +1,4 @@
-export type DependencyHealth = 'ok' | 'warning' | 'critical' | 'skipped';
+﻿export type DependencyHealth = 'ok' | 'warning' | 'critical' | 'skipped';
 
 export interface DependencyStatus {
   name: string;
@@ -22,17 +22,9 @@ export interface DataProviderDescriptor {
   details: string;
 }
 
-export interface SystemInfoSnapshot {
-  name: string;
-  version: string;
-  environment: string;
-  port: number;
-  documentationUrl: string;
-  features: FeatureDescriptor[];
-  dependencies: DependencyStatus[];
-  dataProviders: DataProviderDescriptor[];
-}
+export interface SystemInfoSnapshot {\n  name: string;\n  version: string;\n  environment: string;\n  port: number;\n  documentationUrl: string;\n  features: FeatureDescriptor[];\n  dependencies: DependencyStatus[];\n  dataProviders: DataProviderDescriptor[];\n  featureFlags: Record<string, boolean>;\n  featureFlagsUpdatedAt: string;\n}
 
 export interface SystemInfoProvider {
   getSnapshot(): Promise<SystemInfoSnapshot>;
 }
+

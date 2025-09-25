@@ -1,0 +1,16 @@
+﻿import { NextFunction, Request, Response } from 'express';
+import { featureFlagService } from '../../../infrastructure/feature-flags/feature-flag.service';
+
+export function requireFeature(flagKey: string) {
+  return (request: Request, response: Response, next: NextFunction) => {
+    const enabled = featureFlagService.isEnabled(flagKey);
+
+    if (!enabled) {
+      return response.status(404).json({
+        message: La fonctionnalité \"\" est désactivée.,
+      });
+    }
+
+    return next();
+  };
+}

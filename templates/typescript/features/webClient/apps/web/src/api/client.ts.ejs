@@ -1,0 +1,69 @@
+const apiBaseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:3333').replace(/\/$/, '');
+
+async function handleResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    const message = (await response.text()) || Requête échouée ();
+    throw new Error(message);
+  }
+
+  return (await response.json()) as T;
+}
+
+export interface StatusSnapshot {
+  status?: string;
+  features?: Array<{ key?: string; name?: string; summary?: string }>;
+  dependencies?: Array<{ name?: string; status?: string; details?: string }>;
+  dataProviders?: Array<{ key?: string; status?: string; details?: string }>;
+}
+
+export interface LoginResult {
+  tokens: {
+    accessToken: string;
+    refreshToken: string;
+  };
+}
+
+export interface ProfileResult {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+export async function fetchStatus(signal?: AbortSignal): Promise<StatusSnapshot> {
+  const response = await fetch(${apiBaseUrl}/status, { signal });
+  return handleResponse<StatusSnapshot>(response);
+}
+
+export async function login(email: string, password: string): Promise<LoginResult> {
+  const response = await fetch(${apiBaseUrl}/auth/login, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+
+  return handleResponse<LoginResult>(response);
+}
+
+export async function fetchProfile(accessToken: string): Promise<ProfileResult> {
+  const response = await fetch(${apiBaseUrl}/me, {
+    headers: { Authorization: Bearer  },
+  });
+
+  return handleResponse<ProfileResult>(response);
+}
+
+export async function logout(accessToken: string, refreshToken: string): Promise<void> {
+  const response = await fetch(${apiBaseUrl}/auth/logout, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: Bearer ,
+    },
+    body: JSON.stringify({ refreshToken }),
+  });
+
+  if (!response.ok) {
+    throw new Error(Impossible de se déconnecter ().);
+  }
+}

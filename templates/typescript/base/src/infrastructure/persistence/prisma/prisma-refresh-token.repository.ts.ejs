@@ -1,0 +1,48 @@
+<% if (hasPrisma) { %>
+import { PrismaClient, RefreshToken as PrismaRefreshToken } from '@prisma/client';
+import { RefreshToken } from '../../../domain/entities/refresh-token';
+import { RefreshTokenRepository } from '../../../domain/repositories/refresh-token-repository';
+
+function mapRefreshToken(record: PrismaRefreshToken): RefreshToken {
+  return {
+    id: record.id,
+    userId: record.userId,
+    token: record.token,
+    expiresAt: record.expiresAt,
+    createdAt: record.createdAt,
+    revokedAt: record.revokedAt,
+  };
+}
+
+export class PrismaRefreshTokenRepository implements RefreshTokenRepository {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async create(token: RefreshToken): Promise<RefreshToken> {
+    const created = await this.prisma.refreshToken.create({
+      data: {
+        id: token.id,
+        token: token.token,
+        userId: token.userId,
+        expiresAt: token.expiresAt,
+        createdAt: token.createdAt,
+        revokedAt: token.revokedAt ?? null,
+      },
+    });
+
+    return mapRefreshToken(created);
+  }
+
+  async findByToken(token: string): Promise<RefreshToken | null> {
+    const record = await this.prisma.refreshToken.findUnique({ where: { token } });
+    return record ? mapRefreshToken(record) : null;
+  }
+
+  async delete(token: string): Promise<void> {
+    await this.prisma.refreshToken.deleteMany({ where: { token } });
+  }
+
+  async deleteByUser(userId: string): Promise<void> {
+    await this.prisma.refreshToken.deleteMany({ where: { userId } });
+  }
+}
+<% } %>

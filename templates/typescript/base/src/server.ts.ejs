@@ -1,16 +1,57 @@
-import { createApp } from './interface/http/app';
+﻿import { createApp } from './interface/http/app';
 import { env } from './infrastructure/config/env';
 import { logger } from './infrastructure/logging/logger';
+<% if (features.includes('auth')) { %>
+import { containerReady, shutdownContainer } from './infrastructure/container';
+<% } %>
+
+async function closeServer(server: import('http').Server) {
+  return new Promise<void>((resolve) => {
+    server.close((error) => {
+      if (error) {
+        logger.error({ err: error }, 'Erreur lors de la fermeture du serveur HTTP.');
+      }
+      resolve();
+    });
+  });
+}
 
 async function bootstrap() {
-  const app = createApp();
+  try {
+    const app = createApp();
+<% if (features.includes('auth')) { %>
+    await containerReady;
+<% } %>
 
-  app.listen(env.API_PORT, () => {
-    logger.info(`🚀 ${env.APP_NAME} en écoute sur http://localhost:${env.API_PORT}`);
-    logger.info('✅ Health check : GET /health');
-    logger.info('📊 Statut détaillé : GET /status');
-    logger.info(`📚 Documentation : http://localhost:${env.API_PORT}/docs`);
-  });
+    const server = app.listen(env.API_PORT, () => {
+      logger.info(✅  en écoute sur http://localhost:);
+      logger.info('🩺 Health check : GET /health');
+      logger.info('📊 Statut détaillé : GET /status');
+      logger.info(📘 Documentation : http://localhost:/docs);
+    });
+
+    const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
+    const shutdown = async (signal: NodeJS.Signals) => {
+      logger.info(🛑 Signal  reçu, arrêt en cours...);
+      await closeServer(server);
+<% if (features.includes('auth')) { %>
+      await shutdownContainer();
+<% } %>
+      process.exit(0);
+    };
+
+    for (const signal of signals) {
+      process.once(signal, () => {
+        void shutdown(signal);
+      });
+    }
+  } catch (error) {
+    logger.error({ err: error }, "❌ Échec du démarrage de l'API.");
+<% if (features.includes('auth')) { %>
+    await shutdownContainer().catch(() => undefined);
+<% } %>
+    process.exit(1);
+  }
 }
 
 void bootstrap();

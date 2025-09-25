@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'fs-extra';
-import { BaseTemplateGenerator, GenerateProjectOptions, TemplateDependencies } from './base-generator';
+import { BaseTemplateGenerator, GenerateProjectOptions, TemplateContext, TemplateDependencies } from './base-generator';
 import { DataProviderKey, FeatureKey, Language } from './types';
 
 const templateRoot = path.resolve(__dirname, '../../..', 'templates', 'typescript');
@@ -103,8 +103,12 @@ export class TypeScriptTemplateGenerator extends BaseTemplateGenerator {
     if (dataProviders.includes('prisma')) {
       scripts['prisma:generate'] = 'prisma generate';
       scripts['prisma:migrate'] = 'prisma migrate dev';
+      scripts['prisma:deploy'] = 'prisma migrate deploy';
       scripts['prisma:studio'] = 'prisma studio';
+      scripts['db:migrate'] = 'prisma migrate deploy';
+      scripts['db:seed'] = 'ts-node --project tsconfig.json --files prisma/seed.ts';
     }
+
 
     return {
       dependencies,
@@ -120,9 +124,33 @@ export class TypeScriptTemplateGenerator extends BaseTemplateGenerator {
       hasUserCrud: options.features.includes('userCrud'),
       hasClientPortal: options.features.includes('clientPortal'),
       hasAdminPortal: options.features.includes('adminPortal'),
-      hasDatabaseProviders: options.dataProviders.some((provider) => provider === 'postgresql' || provider === 'mysql' || provider === 'sqlite'),
+      hasDatabaseProviders: options.dataProviders.some((provider) =>
+        ['postgresql', 'mysql', 'sqlite', 'prisma'].includes(provider)
+      ),
       hasPrisma: options.dataProviders.includes('prisma'),
       hasObjectStorage: options.dataProviders.includes('s3'),
     };
   }
+
+  protected async afterGenerate(options: GenerateProjectOptions, context: TemplateContext): Promise<void> {
+    await super.afterGenerate(options, context);
+
+    if (options.dryRun) {
+      return;
+    }
+
+    if (!options.dataProviders.includes('prisma')) {
+      const prismaDir = path.join(options.targetDirectory, 'prisma');
+      const prismaSrcDir = path.join(options.targetDirectory, 'src', 'infrastructure', 'persistence', 'prisma');
+
+      if (await fs.pathExists(prismaDir)) {
+        await fs.remove(prismaDir);
+      }
+
+      if (await fs.pathExists(prismaSrcDir)) {
+        await fs.remove(prismaSrcDir);
+      }
+    }
+  }
 }
+

@@ -4,7 +4,16 @@ import fs from 'fs-extra';
 import path from 'node:path';
 import chalk from 'chalk';
 import { runCreateCommand } from './commands/create';
-import { DataProviderKey, FeatureKey, Language, dataProviderCatalog, featureCatalog } from './generators/types';
+import {
+  DataProviderKey,
+  FeatureKey,
+  FrontendFrameworkKey,
+  Language,
+  dataProviderCatalog,
+  featureCatalog,
+  frontendFrameworkCatalog,
+  isFrontendFrameworkKey,
+} from './generators/types';
 
 const BANNER_ASCII = String.raw`
   |__   __|                     | |       | |            /\    |  __ \|_   _|
@@ -63,26 +72,28 @@ async function main() {
 
   program
     .name('create-template-api')
-    .description("GÃ©nÃ©rateur d'API hexagonale modulaire sans base de donnÃ©es.")
+    .description("Générateur d'API hexagonale modulaire sans base de données.")
     .version(version);
 
   program
-    .argument('[directory]', 'RÃ©pertoire cible (sera crÃ©Ã© s\'il n\'existe pas).')
-    .option('-n, --name <name>', 'Nom du projet. (par dÃ©faut : nom du dossier)')
+    .argument('[directory]', 'Répertoire cible (sera créé s\'il n\'existe pas).')
+    .option('-n, --name <name>', 'Nom du projet. (par défaut : nom du dossier)')
     .option('-l, --language <language>', 'Langage cible (typescript|javascript)')
-    .option('-f, --features <features>', 'Modules Ã  activer (sÃ©parÃ©s par des virgules).')
+    .option('-f, --features <features>', 'Modules à activer (séparés par des virgules).')
     .option(
       '-d, --data-providers <providers>',
-      'Options de persistance Ã  prÃ©parer (sÃ©parÃ©es par des virgules).'
+      'Options de persistance à préparer (séparées par des virgules).'
     )
     .option('-p, --package-manager <manager>', 'Gestionnaire de packages (npm|pnpm|yarn).')
-    .option('--dry-run', 'Affiche les actions sans Ã©crire les fichiers.')
+    .option('--frontend <framework>', 'Front-end à générer (none|react-vite|nextjs).')
+    .option('--dry-run', 'Affiche les actions sans écrire les fichiers.')
     .action(async (directory: string | undefined, commandOptions: Record<string, unknown>) => {
       const languageOption = typeof commandOptions.language === 'string' ? commandOptions.language : undefined;
       const featuresOption = typeof commandOptions.features === 'string' ? commandOptions.features : undefined;
       const packageManagerOption = typeof commandOptions.packageManager === 'string' ? commandOptions.packageManager : undefined;
       const dataProvidersOption =
         typeof commandOptions.dataProviders === 'string' ? (commandOptions.dataProviders as string) : undefined;
+      const frontendOption = typeof commandOptions.frontend === 'string' ? commandOptions.frontend : undefined;
       const dryRun = Boolean(commandOptions.dryRun);
 
       if (languageOption && !isLanguage(languageOption)) {
@@ -117,12 +128,21 @@ async function main() {
         }
       }
 
+      if (frontendOption && !isFrontendFrameworkKey(frontendOption)) {
+        throw new Error(
+          `Framework front inconnu : ${frontendOption}. Valeurs possibles : none, ${frontendFrameworkCatalog
+            .map((framework) => framework.key)
+            .join(', ')}`
+        );
+      }
+
       await runCreateCommand(directory, {
         projectName: typeof commandOptions.name === 'string' ? commandOptions.name : undefined,
         language: languageOption as Language | undefined,
         features: selectedFeatures,
         packageManager: packageManagerOption as 'npm' | 'pnpm' | 'yarn' | undefined,
         dataProviders: selectedDataProviders,
+        frontendFramework: frontendOption as FrontendFrameworkKey | undefined,
         dryRun,
       });
     });
@@ -134,4 +154,6 @@ async function main() {
 }
 
 main();
+
+
 

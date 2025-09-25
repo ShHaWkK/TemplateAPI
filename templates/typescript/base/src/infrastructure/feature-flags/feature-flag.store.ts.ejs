@@ -1,0 +1,66 @@
+﻿import fs from 'node:fs';
+import path from 'node:path';
+import { logger } from '../logging/logger';
+
+type FlagMap = Record<string, boolean>;
+
+export interface FeatureFlagSnapshot {
+  flags: FlagMap;
+  updatedAt: string;
+}
+
+const FEATURE_FLAGS_PATH = path.resolve(process.cwd(), 'config', 'feature-flags.json');
+
+function ensureDirectoryExists(filePath: string) {
+  const directory = path.dirname(filePath);
+  if (!fs.existsSync(directory)) {
+    fs.mkdirSync(directory, { recursive: true });
+  }
+}
+
+export class FeatureFlagStore {
+  private snapshot: FeatureFlagSnapshot;
+
+  constructor() {
+    this.snapshot = this.readSnapshot();
+  }
+
+  private readSnapshot(): FeatureFlagSnapshot {
+    try {
+      const raw = fs.readFileSync(FEATURE_FLAGS_PATH, 'utf8');
+      const parsed = JSON.parse(raw) as FeatureFlagSnapshot;
+      if (!parsed.flags) {
+        return { flags: {}, updatedAt: new Date().toISOString() };
+      }
+      return parsed;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        logger.warn({ err: error }, 'Impossible de lire config/feature-flags.json, utilisation des valeurs par défaut.');
+      }
+      return { flags: {}, updatedAt: new Date().toISOString() };
+    }
+  }
+
+  private persistSnapshot(next: FeatureFlagSnapshot) {
+    ensureDirectoryExists(FEATURE_FLAGS_PATH);
+    fs.writeFileSync(FEATURE_FLAGS_PATH, JSON.stringify(next, null, 2), 'utf8');
+    this.snapshot = next;
+  }
+
+  getSnapshot(): FeatureFlagSnapshot {
+    return this.snapshot;
+  }
+
+  setFlag(flagKey: string, enabled: boolean): FeatureFlagSnapshot {
+    const next: FeatureFlagSnapshot = {
+      flags: {
+        ...this.snapshot.flags,
+        [flagKey]: enabled,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+    this.persistSnapshot(next);
+    logger.info({ flagKey, enabled }, 'Feature flag mis à jour.');
+    return next;
+  }
+}

@@ -1,0 +1,29 @@
+﻿import { Request, Response } from 'express';
+import { featureFlagService } from '../../../infrastructure/feature-flags/feature-flag.service';
+
+class FeatureFlagsController {
+  list(_request: Request, response: Response) {
+    const snapshot = featureFlagService.getSnapshot();
+    return response.json(snapshot);
+  }
+
+  update(request: Request, response: Response) {
+    const { flagKey } = request.params;
+    const { enabled } = request.body as { enabled?: boolean };
+
+    if (typeof enabled !== 'boolean') {
+      return response.status(400).json({ message: 'Le corps de la requête doit contenir { "enabled": boolean }.' });
+    }
+
+    const snapshot = featureFlagService.setFlag(flagKey, enabled);
+    return response.json(snapshot);
+  }
+
+  toggle(request: Request, response: Response) {
+    const { flagKey } = request.params;
+    const snapshot = featureFlagService.toggle(flagKey);
+    return response.json(snapshot);
+  }
+}
+
+export const featureFlagsController = new FeatureFlagsController();

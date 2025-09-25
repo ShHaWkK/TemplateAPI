@@ -1,0 +1,81 @@
+﻿import type { StatusSnapshot } from '../api/client';
+
+interface StatusGroupProps {
+  title: string;
+  items: Array<{ label: string; status?: string; details?: string }>;
+  isLoading?: boolean;
+  emptyMessage?: string;
+}
+
+const SKELETON_ROWS = [0, 1, 2];
+
+export function StatusGroup({ title, items, isLoading = false, emptyMessage }: StatusGroupProps) {
+  if (isLoading) {
+    return (
+      <section className="card card--loading" aria-busy="true">
+        <h3>{title}</h3>
+        <ul className="skeleton-list">
+          {SKELETON_ROWS.map((row) => (
+            <li key={row}>
+              <span className="skeleton skeleton--label" />
+              <span className="skeleton skeleton--line" />
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
+
+  if (items.length === 0) {
+    if (!emptyMessage) {
+      return null;
+    }
+
+    return (
+      <section className="card card--empty">
+        <h3>{title}</h3>
+        <p className="empty-message">{emptyMessage}</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="card">
+      <h3>{title}</h3>
+      <ul>
+        {items.map((item) => (
+          <li key={item.label} data-status={item.status ?? 'unknown'}>
+            <span className="label">{item.label}</span>
+            {item.status ? <span className={adge status-}>{item.status}</span> : null}
+            {item.details ? <p className="details">{item.details}</p> : null}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+export function mapSnapshotToGroups(snapshot?: StatusSnapshot) {
+  if (!snapshot) {
+    return { features: [], dependencies: [], dataProviders: [] };
+  }
+
+  const features = (snapshot.features ?? []).map((feature) => ({
+    label: feature.name ?? feature.key ?? 'Fonctionnalité',
+    details: feature.summary,
+  }));
+
+  const dependencies = (snapshot.dependencies ?? []).map((dependency) => ({
+    label: dependency.name ?? 'Dépendance',
+    status: dependency.status,
+    details: dependency.details,
+  }));
+
+  const dataProviders = (snapshot.dataProviders ?? []).map((provider) => ({
+    label: provider.key ?? 'Provider',
+    status: provider.status,
+    details: provider.details,
+  }));
+
+  return { features, dependencies, dataProviders };
+}

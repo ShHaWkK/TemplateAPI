@@ -1,7 +1,7 @@
-import packageJson from '../../../package.json';
+﻿import packageJson from '../../../package.json';
 import { SystemInfoProvider, SystemInfoSnapshot } from '../../domain/status/system-info';
 import { env } from '../config/env';
-import { templateInfo } from '../config/template-info';
+import { templateInfo } from '../config/template-info';\nimport { featureFlagService } from '../feature-flags/feature-flag.service';
 import { evaluateDataProviders } from './data-provider-health';
 
 export class ConfigSystemInfoProvider implements SystemInfoProvider {
@@ -46,3 +46,4 @@ export class ConfigSystemInfoProvider implements SystemInfoProvider {
     };
   }
 }
+

@@ -1,0 +1,33 @@
+<% if (hasPrisma) { %>
+import { PrismaClient } from '@prisma/client';
+import { logger } from '../../logging/logger';
+
+let prisma: PrismaClient | undefined;
+
+export function hasDatabaseUrlConfigured(): boolean {
+  return Boolean(process.env.DATABASE_URL && process.env.DATABASE_URL.trim().length > 0);
+}
+
+export function getPrismaClient(): PrismaClient {
+  if (!hasDatabaseUrlConfigured()) {
+    throw new Error('DATABASE_URL doit être défini pour utiliser Prisma.');
+  }
+
+  if (!prisma) {
+    prisma = new PrismaClient();
+    logger.info('?Y"s Client Prisma initialisé.');
+  }
+
+  return prisma;
+}
+
+export async function disconnectPrismaClient(): Promise<void> {
+  if (!prisma) {
+    return;
+  }
+
+  await prisma.$disconnect();
+  prisma = undefined;
+  logger.info('?Y"s Client Prisma déconnecté.');
+}
+<% } %>

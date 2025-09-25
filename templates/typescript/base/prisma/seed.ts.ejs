@@ -1,0 +1,64 @@
+<% if (hasPrisma) { %>
+import bcrypt from 'bcryptjs';
+import {
+  disconnectPrismaClient,
+  getPrismaClient,
+  hasDatabaseUrlConfigured,
+} from '../src/infrastructure/persistence/prisma/prisma-client';
+
+async function main() {
+  if (!hasDatabaseUrlConfigured()) {
+    console.log('?Y>? DATABASE_URL non défini, aucune donnée de démonstration Prisma n\'a été insérée.');
+    return;
+  }
+
+  const prisma = getPrismaClient();
+
+  const adminPassword = bcrypt.hashSync('Admin#1234', 10);
+  const clientPassword = bcrypt.hashSync('Client#1234', 10);
+
+  const admin = await prisma.user.upsert({
+    where: { email: 'admin@example.com' },
+    update: {
+      name: 'Administrator',
+      passwordHash: adminPassword,
+      role: 'admin',
+    },
+    create: {
+      email: 'admin@example.com',
+      name: 'Administrator',
+      passwordHash: adminPassword,
+      role: 'admin',
+    },
+  });
+
+  const client = await prisma.user.upsert({
+    where: { email: 'client@example.com' },
+    update: {
+      name: 'Client Demo',
+      passwordHash: clientPassword,
+      role: 'client',
+    },
+    create: {
+      email: 'client@example.com',
+      name: 'Client Demo',
+      passwordHash: clientPassword,
+      role: 'client',
+    },
+  });
+
+  await prisma.refreshToken.deleteMany({ where: { userId: { in: [admin.id, client.id] } } });
+
+  console.log('?o. Base Prisma synchronisée : comptes admin et client préts.');
+}
+
+main()
+  .catch(async (error) => {
+    console.error('??O échec du seed Prisma :', error);
+    await disconnectPrismaClient();
+    process.exit(1);
+  })
+  .finally(async () => {
+    await disconnectPrismaClient();
+  });
+<% } %>
