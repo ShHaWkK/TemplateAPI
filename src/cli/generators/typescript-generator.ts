@@ -1,9 +1,14 @@
 import path from 'node:path';
+import crypto from 'node:crypto';
 import fs from 'fs-extra';
 import { BaseTemplateGenerator, GenerateProjectOptions, TemplateContext, TemplateDependencies } from './base-generator';
 import { DataProviderKey, FeatureKey, Language } from './types';
 
 const templateRoot = path.resolve(__dirname, '../../..', 'templates', 'typescript');
+
+function generateSecret(bytes = 32): string {
+  return crypto.randomBytes(bytes).toString('hex');
+}
 
 export class TypeScriptTemplateGenerator extends BaseTemplateGenerator {
   constructor() {
@@ -31,7 +36,7 @@ export class TypeScriptTemplateGenerator extends BaseTemplateGenerator {
       { name: 'express-rate-limit', version: '^6.11.2' },
       { name: 'helmet', version: '^7.0.0' },
       { name: 'pino', version: '^8.16.1' },
-      { name: 'pino-http', version: '^9.0.1' },
+      { name: 'pino-http', version: '^8.6.1' },
       { name: 'pino-pretty', version: '^10.3.1' },
       { name: 'swagger-ui-express', version: '^5.0.0' },
       { name: 'zod', version: '^3.22.4' },
@@ -118,20 +123,29 @@ export class TypeScriptTemplateGenerator extends BaseTemplateGenerator {
   }
 
   protected getAdditionalContext(options: GenerateProjectOptions, _dependencies: TemplateDependencies) {
+    const hasAuth = options.features.includes('auth');
+    const hasUserCrud = options.features.includes('userCrud');
+    const hasClientPortal = options.features.includes('clientPortal');
+    const hasAdminPortal = options.features.includes('adminPortal');
+    const hasDatabaseProviders = options.dataProviders.some((provider) =>
+      ['postgresql', 'mysql', 'sqlite', 'prisma'].includes(provider)
+    );
+    const hasPrisma = options.dataProviders.includes('prisma');
+    const hasObjectStorage = options.dataProviders.includes('s3');
+
     return {
       isTypeScript: true,
-      hasAuth: options.features.includes('auth'),
-      hasUserCrud: options.features.includes('userCrud'),
-      hasClientPortal: options.features.includes('clientPortal'),
-      hasAdminPortal: options.features.includes('adminPortal'),
-      hasDatabaseProviders: options.dataProviders.some((provider) =>
-        ['postgresql', 'mysql', 'sqlite', 'prisma'].includes(provider)
-      ),
-      hasPrisma: options.dataProviders.includes('prisma'),
-      hasObjectStorage: options.dataProviders.includes('s3'),
+      hasAuth,
+      hasUserCrud,
+      hasClientPortal,
+      hasAdminPortal,
+      hasDatabaseProviders,
+      hasPrisma,
+      hasObjectStorage,
+      generatedJwtSecret: hasAuth ? generateSecret() : undefined,
+      generatedJwtRefreshSecret: hasAuth ? generateSecret() : undefined,
     };
   }
-
   protected async afterGenerate(options: GenerateProjectOptions, context: TemplateContext): Promise<void> {
     await super.afterGenerate(options, context);
 
