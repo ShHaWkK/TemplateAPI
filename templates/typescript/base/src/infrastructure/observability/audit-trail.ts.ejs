@@ -1,0 +1,322 @@
+/**
+ * Audit Trail System
+ * Comprehensive logging of all significant actions for compliance and security
+ */
+
+import { hostname } from 'node:os';
+import { UUID } from '../../domain/shared/value-object';
+
+// Audit Event Types
+export type AuditAction =
+  | 'CREATE'
+  | 'READ'
+  | 'UPDATE'
+  | 'DELETE'
+  | 'LOGIN'
+  | 'LOGOUT'
+  | 'PERMISSION_GRANT'
+  | 'PERMISSION_REVOKE'
+  | 'CONFIG_CHANGE'
+  | 'EXPORT'
+  | 'IMPORT'
+  | 'BACKUP'
+  | 'RESTORE';
+
+export type ResourceType =
+  | 'USER'
+  | 'ROLE'
+  | 'PERMISSION'
+  | 'SETTING'
+  | 'DATA'
+  | 'FILE'
+  | 'API_KEY'
+  | 'SESSION'
+  | 'AUDIT_LOG'
+  | 'CUSTOM';
+
+export interface AuditEvent {
+  id: string;
+  timestamp: Date;
+  action: AuditAction;
+  resourceType: ResourceType;
+  resourceId?: string;
+  actor: AuditActor;
+  target?: AuditTarget;
+  changes?: AuditChanges;
+  context: AuditContext;
+  result: AuditResult;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AuditActor {
+  id: string;
+  type: 'USER' | 'SYSTEM' | 'API_KEY' | 'SERVICE';
+  email?: string;
+  name?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  sessionId?: string;
+}
+
+export interface AuditTarget {
+  id: string;
+  type: ResourceType;
+  before?: Record<string, unknown>;
+  after?: Record<string, unknown>;
+}
+
+export interface AuditChanges {
+  field: string;
+  oldValue: unknown;
+  newValue: unknown;
+  changeType: 'ADD' | 'REMOVE' | 'MODIFY';
+}
+
+export interface AuditContext {
+  correlationId: string;
+  causationId?: string;
+  requestId?: string;
+  endpoint?: string;
+  method?: string;
+  hostname: string;
+  environment?: string;
+  region?: string;
+  custom?: Record<string, unknown>;
+}
+
+export interface AuditResult {
+  success: boolean;
+  statusCode?: number;
+  errorCode?: string;
+  errorMessage?: string;
+  durationMs?: number;
+}
+
+// Audit Event Builder
+export class AuditEventBuilder {
+  private event: Partial<AuditEvent> = {
+    id: new UUID().value,
+    timestamp: new Date(),
+    context: {
+      correlationId: this.generateCorrelationId(),
+      hostname: hostname(),
+    },
+  };
+
+  static create(): AuditEventBuilder {
+    return new AuditEventBuilder();
+  }
+
+  withAction(action: AuditAction): this {
+    this.event.action = action;
+    return this;
+  }
+
+  withResource(type: ResourceType, id?: string): this {
+    this.event.resourceType = type;
+    this.event.resourceId = id;
+    return this;
+  }
+
+  withActor(actor: AuditActor): this {
+    this.event.actor = actor;
+    return this;
+  }
+
+  withUserActor(
+    userId: string,
+    options: {
+      email?: string;
+      name?: string;
+      ipAddress?: string;
+      userAgent?: string;
+      sessionId?: string;
+    } = {}
+  ): this {
+    this.event.actor = {
+      id: userId,
+      type: 'USER',
+      ...options,
+    };
+    return this;
+  }
+
+  withSystemActor(serviceName?: string): this {
+    this.event.actor = {
+      id: serviceName || 'SYSTEM',
+      type: 'SYSTEM',
+    };
+    return this;
+  }
+
+  withTarget(target: AuditTarget): this {
+    this.event.target = target;
+    return this;
+  }
+
+  withChanges(changes: AuditChanges[]): this {
+    this.event.changes = changes;
+    return this;
+  }
+
+  withContext(context: Partial<AuditContext>): this {
+    this.event.context = { ...this.event.context, ...context } as AuditContext;
+    return this;
+  }
+
+  withResult(result: AuditResult): this {
+    this.event.result = result;
+    return this;
+  }
+
+  withMetadata(metadata: Record<string, unknown>): this {
+    this.event.metadata = { ...this.event.metadata, ...metadata };
+    return this;
+  }
+
+  build(): AuditEvent {
+    if (!this.event.action) {
+      throw new Error('Audit action is required');
+    }
+    if (!this.event.resourceType) {
+      throw new Error('Resource type is required');
+    }
+    if (!this.event.actor) {
+      throw new Error('Actor is required');
+    }
+
+    return this.event as AuditEvent;
+  }
+
+  private generateCorrelationId(): string {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+}
+
+// Audit Store Interface
+export interface AuditStore {
+  save(event: AuditEvent): Promise<void>;
+  query(filter: AuditQueryFilter, options?: AuditQueryOptions): Promise<AuditQueryResult>;
+  getById(id: string): Promise<AuditEvent | null>;
+  getByCorrelationId(correlationId: string): Promise<AuditEvent[]>;
+  count(filter: AuditQueryFilter): Promise<number>;
+}
+
+export interface AuditQueryFilter {
+  startDate?: Date;
+  endDate?: Date;
+  actions?: AuditAction[];
+  resourceTypes?: ResourceType[];
+  resourceIds?: string[];
+  actorIds?: string[];
+  actorTypes?: AuditActor['type'][];
+  result?: boolean;
+  correlationId?: string;
+}
+
+export interface AuditQueryOptions {
+  limit?: number;
+  offset?: number;
+  sortBy?: 'timestamp' | 'action' | 'actor' | 'resourceType';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface AuditQueryResult {
+  events: AuditEvent[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+// In-Memory Audit Store (for development/testing)
+export class InMemoryAuditStore implements AuditStore {
+  private events: AuditEvent[] = [];
+
+  async save(event: AuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+
+  async query(filter: AuditQueryFilter, options: AuditQueryOptions = {}): Promise<AuditQueryResult> {
+    let filtered = this.events.filter(event => this.matchesFilter(event, filter));
+
+    // Sort
+    const sortBy = options.sortBy || 'timestamp';
+    const sortOrder = options.sortOrder || 'desc';
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case 'timestamp':
+          comparison = a.timestamp.getTime() - b.timestamp.getTime();
+          break;
+        case 'action':
+          comparison = a.action.localeCompare(b.action);
+          break;
+        case 'actor':
+          comparison = a.actor.id.localeCompare(b.actor.id);
+          break;
+        case 'resourceType':
+          comparison = a.resourceType.localeCompare(b.resourceType);
+          break;
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    // Pagination
+    const offset = options.offset || 0;
+    const limit = options.limit || 50;
+    const paginated = filtered.slice(offset, offset + limit);
+
+    return {
+      events: paginated,
+      total: filtered.length,
+      limit,
+      offset,
+    };
+  }
+
+  async getById(id: string): Promise<AuditEvent | null> {
+    return this.events.find(e => e.id === id) || null;
+  }
+
+  async getByCorrelationId(correlationId: string): Promise<AuditEvent[]> {
+    return this.events.filter(e => e.context.correlationId === correlationId);
+  }
+
+  async count(filter: AuditQueryFilter): Promise<number> {
+    return this.events.filter(event => this.matchesFilter(event, filter)).length;
+  }
+
+  private matchesFilter(event: AuditEvent, filter: AuditQueryFilter): boolean {
+    if (filter.startDate && event.timestamp < filter.startDate) return false;
+    if (filter.endDate && event.timestamp > filter.endDate) return false;
+    if (filter.actions && !filter.actions.includes(event.action)) return false;
+    if (filter.resourceTypes && !filter.resourceTypes.includes(event.resourceType)) return false;
+    if (filter.resourceIds && event.resourceId && !filter.resourceIds.includes(event.resourceId)) return false;
+    if (filter.actorIds && !filter.actorIds.includes(event.actor.id)) return false;
+    if (filter.actorTypes && !filter.actorTypes.includes(event.actor.type)) return false;
+    if (filter.result !== undefined && event.result.success !== filter.result) return false;
+    if (filter.correlationId && event.context.correlationId !== filter.correlationId) return false;
+    return true;
+  }
+}
+
+// Global audit store
+let globalAuditStore: AuditStore = new InMemoryAuditStore();
+
+export function setGlobalAuditStore(store: AuditStore): void {
+  globalAuditStore = store;
+}
+
+export function getGlobalAuditStore(): AuditStore {
+  return globalAuditStore;
+}
+
+// Audit Helper Functions
+export async function logAuditEvent(event: AuditEvent): Promise<void> {
+  await globalAuditStore.save(event);
+}
+
+export async function logAuditEventBuilder(builder: AuditEventBuilder): Promise<void> {
+  const event = builder.build();
+  await globalAuditStore.save(event);
+}

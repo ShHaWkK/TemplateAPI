@@ -1,0 +1,364 @@
+/**
+ * Enterprise Structured Logging System
+ * Supports JSON and pretty formats, multiple transports, correlation IDs
+ */
+
+import { hostname } from 'node:os';
+
+// Log Levels
+export enum LogLevel {
+  TRACE = 0,
+  DEBUG = 1,
+  INFO = 2,
+  WARN = 3,
+  ERROR = 4,
+  FATAL = 5,
+}
+
+export const LogLevelNames: Record<LogLevel, string> = {
+  [LogLevel.TRACE]: 'trace',
+  [LogLevel.DEBUG]: 'debug',
+  [LogLevel.INFO]: 'info',
+  [LogLevel.WARN]: 'warn',
+  [LogLevel.ERROR]: 'error',
+  [LogLevel.FATAL]: 'fatal',
+};
+
+// Log Entry
+export interface LogEntry {
+  timestamp: string;
+  level: LogLevel;
+  levelName: string;
+  message: string;
+  context?: Record<string, unknown>;
+  error?: Error;
+  correlationId?: string;
+  serviceName?: string;
+  environment?: string;
+  hostname: string;
+  pid: number;
+}
+
+// Formatter Interface
+export interface LogFormatter {
+  format(entry: LogEntry): string;
+}
+
+// JSON Formatter
+export class JSONFormatter implements LogFormatter {
+  format(entry: LogEntry): string {
+    const logObject: Record<string, unknown> = {
+      timestamp: entry.timestamp,
+      level: entry.levelName,
+      message: entry.message,
+      hostname: entry.hostname,
+      pid: entry.pid,
+    };
+
+    if (entry.correlationId) {
+      logObject.correlationId = entry.correlationId;
+    }
+
+    if (entry.serviceName) {
+      logObject.service = entry.serviceName;
+    }
+
+    if (entry.environment) {
+      logObject.environment = entry.environment;
+    }
+
+    if (entry.context && Object.keys(entry.context).length > 0) {
+      logObject.context = entry.context;
+    }
+
+    if (entry.error) {
+      logObject.error = {
+        name: entry.error.name,
+        message: entry.error.message,
+        stack: entry.error.stack,
+      };
+    }
+
+    return JSON.stringify(logObject);
+  }
+}
+
+// Pretty Formatter (for development)
+export class PrettyFormatter implements LogFormatter {
+  private readonly colors: Record<LogLevel, string> = {
+    [LogLevel.TRACE]: '\x1b[90m', // Gray
+    [LogLevel.DEBUG]: '\x1b[36m', // Cyan
+    [LogLevel.INFO]: '\x1b[32m', // Green
+    [LogLevel.WARN]: '\x1b[33m', // Yellow
+    [LogLevel.ERROR]: '\x1b[31m', // Red
+    [LogLevel.FATAL]: '\x1b[35m', // Magenta
+  };
+
+  private readonly reset = '\x1b[0m';
+
+  format(entry: LogEntry): string {
+    const timestamp = entry.timestamp.slice(11, 23); // HH:MM:SS.mmm
+    const levelColor = this.colors[entry.level];
+    const levelName = entry.levelName.toUpperCase().padEnd(5);
+
+    let output = `${timestamp} ${levelColor}${levelName}${this.reset} ${entry.message}`;
+
+    if (entry.correlationId) {
+      output += `\n  ${this.colors[LogLevel.TRACE]}correlationId: ${entry.correlationId}${this.reset}`;
+    }
+
+    if (entry.context && Object.keys(entry.context).length > 0) {
+      output += `\n  ${this.colors[LogLevel.TRACE]}context: ${JSON.stringify(entry.context)}${this.reset}`;
+    }
+
+    if (entry.error) {
+      output += `\n  ${this.colors[LogLevel.ERROR]}error: ${entry.error.message}${this.reset}`;
+      if (entry.error.stack) {
+        output += `\n  ${this.colors[LogLevel.TRACE]}${entry.error.stack.split('\n').slice(1).join(`\n  ${this.colors[LogLevel.TRACE]}`)}${this.reset}`;
+      }
+    }
+
+    return output;
+  }
+}
+
+// Transport Interface
+export interface LogTransport {
+  write(entry: LogEntry, formattedMessage: string): void | Promise<void>;
+}
+
+// Console Transport
+export class ConsoleTransport implements LogTransport {
+  write(_entry: LogEntry, formattedMessage: string): void {
+    // eslint-disable-next-line no-console
+    console.log(formattedMessage);
+  }
+}
+
+// File Transport
+export class FileTransport implements LogTransport {
+  private writeStream: import('node:fs').WriteStream;
+
+  constructor(private filePath: string) {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    
+    this.writeStream = fs.createWriteStream(filePath, { flags: 'a' });
+  }
+
+  write(_entry: LogEntry, formattedMessage: string): void {
+    this.writeStream.write(formattedMessage + '\n');
+  }
+
+  close(): void {
+    this.writeStream.end();
+  }
+}
+
+// Logger Configuration
+export interface LoggerConfig {
+  level?: LogLevel;
+  formatter?: LogFormatter;
+  transports?: LogTransport[];
+  serviceName?: string;
+  environment?: string;
+  defaultContext?: Record<string, unknown>;
+  correlationIdGenerator?: () => string;
+}
+
+// Logger Class
+export class Logger {
+  private level: LogLevel;
+  private formatter: LogFormatter;
+  private transports: LogTransport[];
+  private serviceName?: string;
+  private environment?: string;
+  private defaultContext: Record<string, unknown>;
+  private correlationIdGenerator: () => string;
+
+  constructor(config: LoggerConfig = {}) {
+    this.level = config.level ?? LogLevel.INFO;
+    this.formatter = config.formatter ?? new JSONFormatter();
+    this.transports = config.transports ?? [new ConsoleTransport()];
+    this.serviceName = config.serviceName;
+    this.environment = config.environment;
+    this.defaultContext = config.defaultContext ?? {};
+    this.correlationIdGenerator = config.correlationIdGenerator ?? this.generateCorrelationId;
+  }
+
+  // Log Methods
+  trace(message: string, context?: Record<string, unknown>, error?: Error): void {
+    this.log(LogLevel.TRACE, message, context, error);
+  }
+
+  debug(message: string, context?: Record<string, unknown>, error?: Error): void {
+    this.log(LogLevel.DEBUG, message, context, error);
+  }
+
+  info(message: string, context?: Record<string, unknown>, error?: Error): void {
+    this.log(LogLevel.INFO, message, context, error);
+  }
+
+  warn(message: string, context?: Record<string, unknown>, error?: Error): void {
+    this.log(LogLevel.WARN, message, context, error);
+  }
+
+  error(message: string, context?: Record<string, unknown>, error?: Error): void {
+    this.log(LogLevel.ERROR, message, context, error);
+  }
+
+  fatal(message: string, context?: Record<string, unknown>, error?: Error): void {
+    this.log(LogLevel.FATAL, message, context, error);
+  }
+
+  // Child Logger
+  child(context: Record<string, unknown>): Logger {
+    return new Logger({
+      level: this.level,
+      formatter: this.formatter,
+      transports: this.transports,
+      serviceName: this.serviceName,
+      environment: this.environment,
+      defaultContext: { ...this.defaultContext, ...context },
+      correlationIdGenerator: this.correlationIdGenerator,
+    });
+  }
+
+  // Create Logger with Correlation ID
+  withCorrelationId(correlationId?: string): { logger: Logger; correlationId: string } {
+    const cid = correlationId || this.correlationIdGenerator();
+    return {
+      logger: this.child({ correlationId: cid }),
+      correlationId: cid,
+    };
+  }
+
+  // Private Methods
+  private log(
+    level: LogLevel,
+    message: string,
+    context?: Record<string, unknown>,
+    error?: Error
+  ): void {
+    if (level < this.level) {
+      return;
+    }
+
+    const entry: LogEntry = {
+      timestamp: new Date().toISOString(),
+      level,
+      levelName: LogLevelNames[level],
+      message,
+      context: { ...this.defaultContext, ...context },
+      error,
+      serviceName: this.serviceName,
+      environment: this.environment,
+      hostname: hostname(),
+      pid: process.pid,
+    };
+
+    const formattedMessage = this.formatter.format(entry);
+
+    for (const transport of this.transports) {
+      try {
+        transport.write(entry, formattedMessage);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to write to transport:', err);
+      }
+    }
+  }
+
+  private generateCorrelationId(): string {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+}
+
+// Default Logger Instance
+let defaultLogger: Logger | null = null;
+
+export function getDefaultLogger(): Logger {
+  if (!defaultLogger) {
+    defaultLogger = new Logger({
+      level: process.env.LOG_LEVEL ? parseLogLevel(process.env.LOG_LEVEL) : LogLevel.INFO,
+      formatter: process.env.NODE_ENV === 'production' ? new JSONFormatter() : new PrettyFormatter(),
+      serviceName: process.env.SERVICE_NAME,
+      environment: process.env.NODE_ENV,
+    });
+  }
+  return defaultLogger;
+}
+
+export function setDefaultLogger(logger: Logger): void {
+  defaultLogger = logger;
+}
+
+// Utility Functions
+function parseLogLevel(level: string): LogLevel {
+  switch (level.toLowerCase()) {
+    case 'trace':
+      return LogLevel.TRACE;
+    case 'debug':
+      return LogLevel.DEBUG;
+    case 'info':
+      return LogLevel.INFO;
+    case 'warn':
+      return LogLevel.WARN;
+    case 'error':
+      return LogLevel.ERROR;
+    case 'fatal':
+      return LogLevel.FATAL;
+    default:
+      return LogLevel.INFO;
+  }
+}
+
+// Express Middleware Helper
+export function requestLoggingMiddleware(logger: Logger = getDefaultLogger()) {
+  return (req: {
+    method: string;
+    url: string;
+    ip: string;
+    headers: Record<string, string>;
+    id?: string;
+  }, res: {
+    statusCode: number;
+    on: (event: string, callback: () => void) => void;
+  }, next: () => void) => {
+    const start = Date.now();
+    const requestId = req.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    const requestLogger = logger.child({
+      requestId,
+      method: req.method,
+      url: req.url,
+      ip: req.ip,
+    });
+
+    requestLogger.debug('Request started');
+
+    res.on('finish', () => {
+      const duration = Date.now() - start;
+      
+      const logData = {
+        statusCode: res.statusCode,
+        duration,
+      };
+
+      if (res.statusCode >= 500) {
+        requestLogger.error('Request failed', logData);
+      } else if (res.statusCode >= 400) {
+        requestLogger.warn('Request warning', logData);
+      } else {
+        requestLogger.info('Request completed', logData);
+      }
+    });
+
+    next();
+  };
+}

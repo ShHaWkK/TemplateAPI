@@ -1,0 +1,388 @@
+/**
+ * Role-Based Access Control (RBAC) System
+ * Enterprise-grade permission management with granular controls
+ */
+
+import { ApplicationError } from '../../application/errors/application-error';
+import { UUID } from '../../domain/shared/value-object';
+
+// Core RBAC Types
+export interface Permission {
+  resource: string;
+  action: Action;
+  scope: Scope;
+  conditions?: PermissionCondition[];
+}
+
+export type Action = 'create' | 'read' | 'update' | 'delete' | 'manage' | 'execute';
+export type Scope = 'own' | 'group' | 'organization' | 'all';
+
+export interface PermissionCondition {
+  field: string;
+  operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'nin' | 'contains';
+  value: unknown;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  description?: string;
+  permissions: Permission[];
+  parentRoleId?: string;
+  isSystemRole: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface UserRole {
+  userId: string;
+  roleId: string;
+  assignedBy: string;
+  assignedAt: Date;
+  expiresAt?: Date;
+  context?: Record<string, unknown>;
+}
+
+export interface AccessDecision {
+  granted: boolean;
+  reason: string;
+  permissions: Permission[];
+  constraints?: Record<string, unknown>;
+}
+
+// RBAC Service
+export class RBACService {
+  private roles: Map<string, Role> = new Map();
+  private userRoles: Map<string, UserRole[]> = new Map();
+  private permissionCache: Map<string, AccessDecision> = new Map();
+  private cacheTTL: number = 5 * 60 * 1000; // 5 minutes
+
+  constructor() {
+    this.initializeDefaultRoles();
+  }
+
+  // Role Management
+  async createRole(roleData: Omit<Role, 'id' | 'createdAt' | 'updatedAt'>): Promise<Role> {
+    const id = new UUID().value;
+    const now = new Date();
+
+    const role: Role = {
+      ...roleData,
+      id,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    this.roles.set(id, role);
+    this.invalidateCache();
+
+    return role;
+  }
+
+  async updateRole(roleId: string, updates: Partial<Role>): Promise<Role> {
+    const role = this.roles.get(roleId);
+    if (!role) {
+      throw new ApplicationError('ROLE_NOT_FOUND', `Role not found: ${roleId}`);
+    }
+
+    const updatedRole: Role = {
+      ...role,
+      ...updates,
+      id: role.id, // Prevent ID change
+      updatedAt: new Date(),
+    };
+
+    this.roles.set(roleId, updatedRole);
+    this.invalidateCache();
+
+    return updatedRole;
+  }
+
+  async deleteRole(roleId: string, force: boolean = false): Promise<void> {
+    const role = this.roles.get(roleId);
+    if (!role) {
+      throw new ApplicationError('ROLE_NOT_FOUND', `Role not found: ${roleId}`);
+    }
+
+    if (role.isSystemRole && !force) {
+      throw new ApplicationError('CANNOT_DELETE_SYSTEM_ROLE', 'Cannot delete system roles');
+    }
+
+    // Check if role is assigned to users
+    const assignedUsers = Array.from(this.userRoles.entries())
+      .filter(([_, userRoles]) => userRoles.some(ur => ur.roleId === roleId));
+
+    if (assignedUsers.length > 0 && !force) {
+      throw new ApplicationError(
+        'ROLE_HAS_ASSIGNED_USERS',
+        `Role has ${assignedUsers.length} assigned users. Use force=true to delete anyway.`
+      );
+    }
+
+    this.roles.delete(roleId);
+    this.invalidateCache();
+  }
+
+  // User Role Management
+  async assignRole(
+    userId: string,
+    roleId: string,
+    assignedBy: string,
+    options: {
+      expiresAt?: Date;
+      context?: Record<string, unknown>;
+    } = {}
+  ): Promise<UserRole> {
+    const role = this.roles.get(roleId);
+    if (!role) {
+      throw new ApplicationError('ROLE_NOT_FOUND', `Role not found: ${roleId}`);
+    }
+
+    const userRole: UserRole = {
+      userId,
+      roleId,
+      assignedBy,
+      assignedAt: new Date(),
+      expiresAt: options.expiresAt,
+      context: options.context,
+    };
+
+    const userRoles = this.userRoles.get(userId) || [];
+    userRoles.push(userRole);
+    this.userRoles.set(userId, userRoles);
+
+    this.invalidateUserCache(userId);
+
+    return userRole;
+  }
+
+  async revokeRole(userId: string, roleId: string, revokedBy: string): Promise<void> {
+    const userRoles = this.userRoles.get(userId) || [];
+    const index = userRoles.findIndex(ur => ur.roleId === roleId);
+
+    if (index === -1) {
+      throw new ApplicationError(
+        'ROLE_NOT_ASSIGNED',
+        `Role ${roleId} is not assigned to user ${userId}`
+      );
+    }
+
+    userRoles.splice(index, 1);
+    this.userRoles.set(userId, userRoles);
+    this.invalidateUserCache(userId);
+  }
+
+  // Permission Checking
+  async checkPermission(
+    userId: string,
+    requiredPermission: Permission,
+    context?: Record<string, unknown>
+  ): Promise<AccessDecision> {
+    const cacheKey = this.buildCacheKey(userId, requiredPermission, context);
+    const cached = this.permissionCache.get(cacheKey);
+
+    if (cached && !this.isCacheExpired(cached)) {
+      return cached;
+    }
+
+    const userPermissions = await this.getUserPermissions(userId);
+    const matchingPermissions = this.findMatchingPermissions(
+      userPermissions,
+      requiredPermission
+    );
+
+    // Evaluate conditions
+    const validPermissions = matchingPermissions.filter(p => 
+      this.evaluateConditions(p.conditions, context)
+    );
+
+    const decision: AccessDecision = validPermissions.length > 0
+      ? {
+          granted: true,
+          reason: 'Permission granted',
+          permissions: validPermissions,
+        }
+      : {
+          granted: false,
+          reason: matchingPermissions.length > 0
+            ? 'Permission conditions not met'
+            : 'No matching permission found',
+          permissions: matchingPermissions,
+          constraints: context,
+        };
+
+    this.permissionCache.set(cacheKey, decision);
+    return decision;
+  }
+
+  async requirePermission(
+    userId: string,
+    permission: Permission,
+    context?: Record<string, unknown>
+  ): Promise<void> {
+    const decision = await this.checkPermission(userId, permission, context);
+
+    if (!decision.granted) {
+      throw new ApplicationError(
+        'FORBIDDEN',
+        `Access denied: ${decision.reason}`,
+        { requiredPermission: permission }
+      );
+    }
+  }
+
+  // Helper Methods
+  private async getUserPermissions(userId: string): Promise<Permission[]> {
+    const userRoles = this.userRoles.get(userId) || [];
+    const now = new Date();
+
+    const activeRoles = userRoles.filter(ur => 
+      !ur.expiresAt || ur.expiresAt > now
+    );
+
+    const permissions: Permission[] = [];
+
+    for (const userRole of activeRoles) {
+      const role = this.roles.get(userRole.roleId);
+      if (role) {
+        permissions.push(...role.permissions);
+      }
+    }
+
+    return permissions;
+  }
+
+  private findMatchingPermissions(
+    permissions: Permission[],
+    required: Permission
+  ): Permission[] {
+    return permissions.filter(p => 
+      (p.resource === required.resource || p.resource === '*') &&
+      (p.action === required.action || p.action === 'manage' || required.action === 'manage') &&
+      this.isScopeSufficient(p.scope, required.scope)
+    );
+  }
+
+  private isScopeSufficient(granted: Scope, required: Scope): boolean {
+    const scopeHierarchy: Scope[] = ['own', 'group', 'organization', 'all'];
+    const grantedIndex = scopeHierarchy.indexOf(granted);
+    const requiredIndex = scopeHierarchy.indexOf(required);
+    return grantedIndex >= requiredIndex;
+  }
+
+  private evaluateConditions(
+    conditions: PermissionCondition[] | undefined,
+    context?: Record<string, unknown>
+  ): boolean {
+    if (!conditions || conditions.length === 0) {
+      return true;
+    }
+
+    return conditions.every(condition => {
+      const value = context?.[condition.field];
+
+      switch (condition.operator) {
+        case 'eq':
+          return value === condition.value;
+        case 'ne':
+          return value !== condition.value;
+        case 'gt':
+          return Number(value) > Number(condition.value);
+        case 'gte':
+          return Number(value) >= Number(condition.value);
+        case 'lt':
+          return Number(value) < Number(condition.value);
+        case 'lte':
+          return Number(value) <= Number(condition.value);
+        case 'in':
+          return Array.isArray(condition.value) && condition.value.includes(value);
+        case 'nin':
+          return Array.isArray(condition.value) && !condition.value.includes(value);
+        case 'contains':
+          return typeof value === 'string' && value.includes(String(condition.value));
+        default:
+          return false;
+      }
+    });
+  }
+
+  // Cache Management
+  private buildCacheKey(
+    userId: string,
+    permission: Permission,
+    context?: Record<string, unknown>
+  ): string {
+    const contextHash = context 
+      ? crypto.createHash('md5').update(JSON.stringify(context)).digest('hex')
+      : 'empty';
+    return `${userId}:${permission.resource}:${permission.action}:${permission.scope}:${contextHash}`;
+  }
+
+  private isCacheExpired(decision: AccessDecision): boolean {
+    // Simple cache with 5-minute expiration
+    const now = Date.now();
+    const cacheTime = (decision as unknown as { _cacheTime: number })._cacheTime || 0;
+    return now - cacheTime > this.cacheTTL;
+  }
+
+  private invalidateCache(): void {
+    this.permissionCache.clear();
+  }
+
+  private invalidateUserCache(userId: string): void {
+    for (const [key] of this.permissionCache) {
+      if (key.startsWith(`${userId}:`)) {
+        this.permissionCache.delete(key);
+      }
+    }
+  }
+
+  // Initialization
+  private initializeDefaultRoles(): void {
+    // Admin role
+    this.roles.set('admin', {
+      id: 'admin',
+      name: 'Administrator',
+      description: 'Full system access',
+      permissions: [
+        { resource: '*', action: 'manage', scope: 'all' },
+      ],
+      isSystemRole: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    // User role
+    this.roles.set('user', {
+      id: 'user',
+      name: 'User',
+      description: 'Standard user access',
+      permissions: [
+        { resource: 'profile', action: 'manage', scope: 'own' },
+        { resource: 'posts', action: 'read', scope: 'all' },
+        { resource: 'posts', action: 'create', scope: 'own' },
+        { resource: 'posts', action: 'update', scope: 'own' },
+        { resource: 'posts', action: 'delete', scope: 'own' },
+      ],
+      isSystemRole: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    // Guest role
+    this.roles.set('guest', {
+      id: 'guest',
+      name: 'Guest',
+      description: 'Anonymous user access',
+      permissions: [
+        { resource: 'posts', action: 'read', scope: 'all' },
+      ],
+      isSystemRole: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+}
+
+// Export singleton instance
+export const rbacService = new RBACService();

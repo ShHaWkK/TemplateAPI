@@ -1,0 +1,261 @@
+/**
+ * CQRS Command Bus Implementation
+ * Handles separation of commands (writes) from queries (reads)
+ */
+
+import { globalEventBus } from '../../domain/shared/domain-event';
+
+// Command Types
+export interface Command {
+  readonly type: string;
+  readonly payload: Record<string, unknown>;
+  readonly metadata?: CommandMetadata;
+}
+
+export interface CommandMetadata {
+  correlationId?: string;
+  causationId?: string;
+  userId?: string;
+  timestamp?: Date;
+  source?: string;
+}
+
+// Command Handler
+export type CommandHandler<T extends Command = Command> = (
+  command: T,
+  context: CommandContext
+) => Promise<CommandResult> | CommandResult;
+
+export interface CommandContext {
+  userId?: string;
+  roles?: string[];
+  permissions?: string[];
+  correlationId: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface CommandResult {
+  success: boolean;
+  data?: unknown;
+  error?: CommandError;
+  events?: string[];
+}
+
+export interface CommandError {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+// Command Builder
+export class CommandBuilder {
+  private command: Partial<Command> = {
+    payload: {},
+    metadata: {},
+  };
+
+  static create(): CommandBuilder {
+    return new CommandBuilder();
+  }
+
+  withType(type: string): this {
+    this.command.type = type;
+    return this;
+  }
+
+  withPayload(payload: Record<string, unknown>): this {
+    this.command.payload = { ...this.command.payload, ...payload };
+    return this;
+  }
+
+  withMetadata(metadata: CommandMetadata): this {
+    this.command.metadata = { ...this.command.metadata, ...metadata };
+    return this;
+  }
+
+  build(): Command {
+    if (!this.command.type) {
+      throw new Error('Command type is required');
+    }
+
+    return {
+      type: this.command.type,
+      payload: this.command.payload || {},
+      metadata: this.command.metadata || {},
+    } as Command;
+  }
+}
+
+// Command Bus
+export class CommandBus {
+  private handlers: Map<string, CommandHandler> = new Map();
+  private middlewares: Array<(command: Command, next: () => Promise<CommandResult>) => Promise<CommandResult>> = [];
+  private history: Array<{ command: Command; result: CommandResult; timestamp: Date }> = [];
+  private maxHistorySize: number;
+
+  constructor(options: { maxHistorySize?: number } = {}) {
+    this.maxHistorySize = options.maxHistorySize ?? 1000;
+  }
+
+  use(middleware: (command: Command, next: () => Promise<CommandResult>) => Promise<CommandResult>): this {
+    this.middlewares.push(middleware);
+    return this;
+  }
+
+  register<T extends Command>(commandType: string, handler: CommandHandler<T>): void {
+    if (this.handlers.has(commandType)) {
+      throw new Error(`Handler already registered for command type: ${commandType}`);
+    }
+    this.handlers.set(commandType, handler as CommandHandler);
+  }
+
+  unregister(commandType: string): void {
+    this.handlers.delete(commandType);
+  }
+
+  async execute(command: Command, context?: Partial<CommandContext>): Promise<CommandResult> {
+    const fullContext: CommandContext = {
+      correlationId: command.metadata?.correlationId || this.generateCorrelationId(),
+      metadata: {},
+      ...context,
+    };
+
+    const executeWithMiddleware = async (index: number): Promise<CommandResult> => {
+      if (index >= this.middlewares.length) {
+        return this.executeHandler(command, fullContext);
+      }
+      return this.middlewares[index](command, () => executeWithMiddleware(index + 1));
+    };
+
+    const result = await executeWithMiddleware(0);
+
+    // Store in history
+    this.history.push({ command, result, timestamp: new Date() });
+    if (this.history.length > this.maxHistorySize) {
+      this.history.shift();
+    }
+
+    // Publish command executed event
+    if (result.success) {
+      await globalEventBus.publish(
+        CommandExecutedEvent.create({
+          commandType: command.type,
+          correlationId: fullContext.correlationId,
+          userId: fullContext.userId,
+        })
+      );
+    }
+
+    return result;
+  }
+
+  async executeMany(commands: Command[], context?: Partial<CommandContext>): Promise<CommandResult[]> {
+    const results: CommandResult[] = [];
+    
+    for (const command of commands) {
+      const result = await this.execute(command, context);
+      results.push(result);
+      
+      if (!result.success) {
+        // Stop on first failure (saga pattern could be used for rollback)
+        break;
+      }
+    }
+    
+    return results;
+  }
+
+  getHistory(): Array<{ command: Command; result: CommandResult; timestamp: Date }> {
+    return [...this.history];
+  }
+
+  clearHistory(): void {
+    this.history = [];
+  }
+
+  private async executeHandler(command: Command, context: CommandContext): Promise<CommandResult> {
+    const handler = this.handlers.get(command.type);
+    
+    if (!handler) {
+      return {
+        success: false,
+        error: {
+          code: 'COMMAND_HANDLER_NOT_FOUND',
+          message: `No handler registered for command type: ${command.type}`,
+        },
+      };
+    }
+
+    try {
+      return await handler(command, context);
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          code: 'COMMAND_EXECUTION_ERROR',
+          message: error instanceof Error ? error.message : 'Unknown error',
+          details: { error },
+        },
+      };
+    }
+  }
+
+  private generateCorrelationId(): string {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+}
+
+// Command Executed Event
+class CommandExecutedEvent {
+  static create(data: { commandType: string; correlationId: string; userId?: string }) {
+    return {
+      eventId: `${Date.now()}-${Math.random()}`,
+      eventType: 'COMMAND_EXECUTED',
+      aggregateId: data.correlationId,
+      aggregateType: 'Command',
+      occurredAt: new Date(),
+      version: 1,
+      payload: data,
+    };
+  }
+}
+
+// Global command bus instance
+export const globalCommandBus = new CommandBus({ maxHistorySize: 10000 });
+
+// Middleware examples
+export const loggingMiddleware = (logger: Console) => 
+  async (command: Command, next: () => Promise<CommandResult>): Promise<CommandResult> => {
+    const start = Date.now();
+    logger.log(`Executing command: ${command.type}`);
+    
+    const result = await next();
+    
+    const duration = Date.now() - start;
+    logger.log(
+      `Command ${command.type} ${result.success ? 'succeeded' : 'failed'} in ${duration}ms`
+    );
+    
+    return result;
+  };
+
+export const transactionMiddleware = 
+  async (command: Command, next: () => Promise<CommandResult>): Promise<CommandResult> => {
+    // Start transaction
+    // ...
+    
+    try {
+      const result = await next();
+      
+      if (result.success) {
+        // Commit transaction
+      } else {
+        // Rollback transaction
+      }
+      
+      return result;
+    } catch (error) {
+      // Rollback transaction
+      throw error;
+    }
+  };

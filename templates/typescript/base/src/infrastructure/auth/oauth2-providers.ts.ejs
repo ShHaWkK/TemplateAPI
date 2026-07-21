@@ -1,0 +1,234 @@
+/**
+ * OAuth2 / OIDC Provider Support
+ * Supports multiple identity providers (Google, GitHub, Microsoft, etc.)
+ */
+
+import crypto from 'node:crypto';
+import { ApplicationError } from '../../application/errors/application-error';
+
+// OAuth2 Types
+export interface OAuth2Config {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  authorizationEndpoint: string;
+  tokenEndpoint: string;
+  userInfoEndpoint: string;
+  scopes: string[];
+}
+
+export interface OAuth2Tokens {
+  accessToken: string;
+  refreshToken?: string;
+  idToken?: string;
+  tokenType: string;
+  expiresIn: number;
+  scope: string;
+}
+
+export interface OAuth2UserInfo {
+  id: string;
+  email: string;
+  emailVerified?: boolean;
+  name?: string;
+  givenName?: string;
+  familyName?: string;
+  picture?: string;
+  locale?: string;
+  raw: Record<string, unknown>;
+}
+
+// Base OAuth2 Provider
+export abstract class OAuth2Provider {
+  protected abstract config: OAuth2Config;
+  protected abstract name: string;
+
+  abstract getAuthorizationUrl(state: string, additionalParams?: Record<string, string>): string;
+  abstract exchangeCode(code: string): Promise<OAuth2Tokens>;
+  abstract getUserInfo(tokens: OAuth2Tokens): Promise<OAuth2UserInfo>;
+  abstract refreshTokens(refreshToken: string): Promise<OAuth2Tokens>;
+
+  getName(): string {
+    return this.name;
+  }
+
+  protected generateState(): string {
+    return crypto.randomBytes(32).toString('hex');
+  }
+
+  protected validateState(state: string, storedState: string): boolean {
+    try {
+      return crypto.timingSafeEqual(Buffer.from(state), Buffer.from(storedState));
+    } catch {
+      return false;
+    }
+  }
+}
+
+// Google OAuth2 Provider
+export class GoogleOAuthProvider extends OAuth2Provider {
+  protected name = 'google';
+  protected config: OAuth2Config;
+
+  constructor(config: Pick<OAuth2Config, 'clientId' | 'clientSecret' | 'redirectUri'>) {
+    super();
+    this.config = {
+      ...config,
+      authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+      tokenEndpoint: 'https://oauth2.googleapis.com/token',
+      userInfoEndpoint: 'https://openidconnect.googleapis.com/v1/userinfo',
+      scopes: ['openid', 'email', 'profile'],
+    };
+  }
+
+  getAuthorizationUrl(state: string, additionalParams?: Record<string, string>): string {
+    const params = new URLSearchParams({
+      client_id: this.config.clientId,
+      redirect_uri: this.config.redirectUri,
+      response_type: 'code',
+      scope: this.config.scopes.join(' '),
+      state,
+      access_type: 'offline',
+      prompt: 'consent',
+      ...additionalParams,
+    });
+
+    return `${this.config.authorizationEndpoint}?${params.toString()}`;
+  }
+
+  async exchangeCode(code: string): Promise<OAuth2Tokens> {
+    const params = new URLSearchParams({
+      client_id: this.config.clientId,
+      client_secret: this.config.clientSecret,
+      code,
+      grant_type: 'authorization_code',
+      redirect_uri: this.config.redirectUri,
+    });
+
+    const response = await fetch(this.config.tokenEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new ApplicationError(
+        'OAUTH2_TOKEN_EXCHANGE_FAILED',
+        'Failed to exchange authorization code',
+        { originalError: error }
+      );
+    }
+
+    const data = await response.json();
+
+    return {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      idToken: data.id_token,
+      tokenType: data.token_type,
+      expiresIn: data.expires_in,
+      scope: data.scope,
+    };
+  }
+
+  async getUserInfo(tokens: OAuth2Tokens): Promise<OAuth2UserInfo> {
+    const response = await fetch(this.config.userInfoEndpoint, {
+      headers: { Authorization: `Bearer ${tokens.accessToken}` },
+    });
+
+    if (!response.ok) {
+      throw new ApplicationError(
+        'OAUTH2_USER_INFO_FAILED',
+        'Failed to fetch user information'
+      );
+    }
+
+    const data = await response.json();
+
+    return {
+      id: data.sub,
+      email: data.email,
+      emailVerified: data.email_verified,
+      name: data.name,
+      givenName: data.given_name,
+      familyName: data.family_name,
+      picture: data.picture,
+      locale: data.locale,
+      raw: data,
+    };
+  }
+
+  async refreshTokens(refreshToken: string): Promise<OAuth2Tokens> {
+    const params = new URLSearchParams({
+      client_id: this.config.clientId,
+      client_secret: this.config.clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    });
+
+    const response = await fetch(this.config.tokenEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+
+    if (!response.ok) {
+      throw new ApplicationError(
+        'OAUTH2_TOKEN_REFRESH_FAILED',
+        'Failed to refresh tokens'
+      );
+    }
+
+    const data = await response.json();
+
+    return {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token || refreshToken,
+      tokenType: data.token_type,
+      expiresIn: data.expires_in,
+      scope: data.scope,
+    };
+  }
+}
+
+// Provider Registry
+export class OAuth2ProviderRegistry {
+  private providers: Map<string, OAuth2Provider> = new Map();
+
+  register(name: string, provider: OAuth2Provider): void {
+    this.providers.set(name, provider);
+  }
+
+  get(name: string): OAuth2Provider | undefined {
+    return this.providers.get(name);
+  }
+
+  has(name: string): boolean {
+    return this.providers.has(name);
+  }
+
+  getAll(): Map<string, OAuth2Provider> {
+    return new Map(this.providers);
+  }
+
+  getAvailableProviders(): string[] {
+    return Array.from(this.providers.keys());
+  }
+}
+
+// Global registry
+export const oauth2ProviderRegistry = new OAuth2ProviderRegistry();
+
+// Factory function for creating providers
+export function createOAuth2Provider(
+  providerName: string,
+  config: { clientId: string; clientSecret: string; redirectUri: string }
+): OAuth2Provider {
+  switch (providerName.toLowerCase()) {
+    case 'google':
+      return new GoogleOAuthProvider(config);
+    default:
+      throw new Error(`Unsupported OAuth2 provider: ${providerName}`);
+  }
+}

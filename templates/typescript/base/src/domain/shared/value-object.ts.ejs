@@ -1,0 +1,108 @@
+/**
+ * Base class for Value Objects following DDD principles
+ * Value Objects are immutable and identified by their attributes
+ */
+
+export abstract class ValueObject<T> {
+  protected readonly _value: T;
+
+  constructor(value: T) {
+    this._value = this.validate(value);
+    Object.freeze(this);
+  }
+
+  get value(): T {
+    return this._value;
+  }
+
+  protected abstract validate(value: T): T;
+
+  equals(other: ValueObject<T>): boolean {
+    if (!(other instanceof ValueObject)) {
+      return false;
+    }
+    return JSON.stringify(this._value) === JSON.stringify(other._value);
+  }
+
+  toString(): string {
+    return JSON.stringify(this._value);
+  }
+}
+
+/**
+ * UUID Value Object
+ */
+export class UUID extends ValueObject<string> {
+  constructor(value?: string) {
+    super(value ?? UUID.generate());
+  }
+
+  protected validate(value: string): string {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(value)) {
+      throw new Error(`Invalid UUID format: ${value}`);
+    }
+    return value.toLowerCase();
+  }
+
+  private static generate(): string {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+}
+
+/**
+ * Email Value Object
+ */
+export class Email extends ValueObject<string> {
+  protected validate(value: string): string {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(value)) {
+      throw new Error(`Invalid email format: ${value}`);
+    }
+    return value.toLowerCase().trim();
+  }
+}
+
+/**
+ * DateTime Value Object
+ */
+export class DateTime extends ValueObject<Date> {
+  constructor(value?: Date | string | number) {
+    if (value === undefined) {
+      super(new Date());
+    } else if (value instanceof Date) {
+      super(value);
+    } else {
+      super(new Date(value));
+    }
+  }
+
+  protected validate(value: Date): Date {
+    if (isNaN(value.getTime())) {
+      throw new Error('Invalid date');
+    }
+    return value;
+  }
+
+  addDays(days: number): DateTime {
+    const newDate = new Date(this._value);
+    newDate.setDate(newDate.getDate() + days);
+    return new DateTime(newDate);
+  }
+
+  isBefore(other: DateTime): boolean {
+    return this._value < other._value;
+  }
+
+  isAfter(other: DateTime): boolean {
+    return this._value > other._value;
+  }
+
+  toISOString(): string {
+    return this._value.toISOString();
+  }
+}
