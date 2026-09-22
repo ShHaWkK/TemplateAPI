@@ -205,7 +205,7 @@ async function customizeReactVite(frontendDir: string, projectName: string, envF
     "    throw new Error(\"Impossible de contacter l'API (statut \" + response.status + \")\");",
     '  }',
     '',
-    '  return (await response.json()) a>FDFs StatusSnapshot;',
+    '  return (await response.json()) as StatusSnapshot;',
     '}',
   ];
   await fs.writeFile(path.join(frontendDir, 'src', 'lib', 'api.ts'), apiLines.join('\n') + '\n');
