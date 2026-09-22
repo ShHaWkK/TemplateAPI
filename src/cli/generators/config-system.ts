@@ -109,14 +109,29 @@ function mergeConfig(base: TemplateConfig, override: TemplateConfig): TemplateCo
   };
 }
 
+export type GenerationHookName = 'preGenerate' | 'postGenerate';
+export type FeatureGenerationHookName = 'preFeatureGenerate' | 'postFeatureGenerate';
+
 export async function executeHook(
-  hookName: keyof TemplateHooks,
+  hookName: GenerationHookName,
   hooks: TemplateHooks | undefined,
   context: HookContext
 ): Promise<void> {
   const hook = hooks?.[hookName];
-  if (typeof hook === 'function') {
+  if (hook) {
     await hook(context);
+  }
+}
+
+export async function executeFeatureHook(
+  hookName: FeatureGenerationHookName,
+  hooks: TemplateHooks | undefined,
+  feature: string,
+  context: HookContext
+): Promise<void> {
+  const hook = hooks?.[hookName];
+  if (hook) {
+    await hook(feature, context);
   }
 }
 
