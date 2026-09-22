@@ -10,7 +10,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "ts-node src/cli/index.ts",
-    "test": "tsc -p tsconfig.json --noEmit"
+    "test": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "npm test && npm run build"
   },
   "files": [
     "dist",
@@ -23,9 +24,19 @@
     "cli",
     "api",
     "template",
+    "scaffolding",
+    "hexagonal-architecture",
     "express",
     "typescript"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ShHaWkK/TemplateAPI.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ShHaWkK/TemplateAPI/issues"
+  },
+  "homepage": "https://github.com/ShHaWkK/TemplateAPI#readme",
   "license": "MIT",
   "dependencies": {
     "chalk": "^5.3.0",
