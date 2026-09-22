@@ -11,8 +11,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "ts-node src/cli/index.ts",
-    "test": "tsc -p tsconfig.json --noEmit",
-    "prepublishOnly": "npm test && npm run build"
+    "test": "npm run typecheck && npm run test:generated",
+    "prepublishOnly": "npm test && npm run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:generated": "ts-node scripts/test-generated-customizers.ts"
   },
   "files": [
     "dist",
