@@ -1,9 +1,10 @@
 {
-  "name": "template-api",
+  "name": "create-shhawk-api",
   "version": "1.0.0",
-  "description": "Générateur d'API hexagonale modulaire sans base de données.",
+  "description": "CLI pour générer des API Node.js modulaires en TypeScript ou JavaScript avec architecture hexagonale.",
   "main": "dist/cli/index.js",
   "bin": {
+    "create-shhawk-api": "dist/cli/index.js",
     "create-template-api": "dist/cli/index.js"
   },
   "type": "commonjs",
@@ -52,5 +53,8 @@
     "@types/node": "^20.11.20",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
