@@ -71,22 +71,22 @@ async function main() {
   printBanner();
 
   program
-    .name('create-template-api')
-    .description("G�n�rateur d'API hexagonale modulaire sans base de donn�es.")
+    .name('create-shhawk-api')
+    .description("Générateur d'API hexagonale modulaire en TypeScript ou JavaScript.")
     .version(version);
 
   program
     .argument('[directory]', 'R�pertoire cible (sera cr�� s\'il n\'existe pas).')
-    .option('-n, --name <name>', 'Nom du projet. (par d�faut : nom du dossier)')
+    .option('-n, --name <name>', 'Nom du projet. (par défaut : nom du dossier)')
     .option('-l, --language <language>', 'Langage cible (typescript|javascript)')
-    .option('-f, --features <features>', 'Modules � activer (s�par�s par des virgules).')
+    .option('-f, --features <features>', 'Modules à activer (séparés par des virgules).')
     .option(
       '-d, --data-providers <providers>',
-      'Options de persistance � pr�parer (s�par�es par des virgules).'
+      'Options de persistance à préparer (séparées par des virgules).'
     )
     .option('-p, --package-manager <manager>', 'Gestionnaire de packages (npm|pnpm|yarn).')
-    .option('--frontend <framework>', 'Front-end � g�n�rer (none|react-vite|nextjs).')
-    .option('--dry-run', 'Affiche les actions sans �crire les fichiers.')
+    .option('--frontend <framework>', 'Front-end à générer (none|react-vite|nextjs).')
+    .option('--dry-run', 'Affiche les actions sans écrire les fichiers.')
     .action(async (directory: string | undefined, commandOptions: Record<string, unknown>) => {
       const languageOption = typeof commandOptions.language === 'string' ? commandOptions.language : undefined;
       const featuresOption = typeof commandOptions.features === 'string' ? commandOptions.features : undefined;

@@ -11,8 +11,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "ts-node src/cli/index.ts",
-    "test": "tsc -p tsconfig.json --noEmit",
-    "prepublishOnly": "npm test && npm run build"
+    "test": "npm run typecheck && npm run test:generated",
+    "prepublishOnly": "npm test && npm run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:generated": "ts-node scripts/test-generated-customizers.ts"
   },
   "files": [
     "dist",
@@ -40,7 +42,7 @@
   "homepage": "https://github.com/ShHaWkK/TemplateAPI#readme",
   "license": "MIT",
   "dependencies": {
-    "chalk": "^5.3.0",
+    "chalk": "^4.1.2",
     "commander": "^11.1.0",
     "ejs": "^3.1.10",
     "fs-extra": "^11.2.0",
