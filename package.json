@@ -42,7 +42,7 @@
   "homepage": "https://github.com/ShHaWkK/TemplateAPI#readme",
   "license": "MIT",
   "dependencies": {
-    "chalk": "^5.3.0",
+    "chalk": "^4.1.2",
     "commander": "^11.1.0",
     "ejs": "^3.1.10",
     "fs-extra": "^11.2.0",
